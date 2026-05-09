@@ -22,4 +22,7 @@ public class Ciudadano {
 
     @Column(name = "voto_obligatorio", nullable = false)
     private Boolean votoObligatorio;
+
+    @Column(name = "habilitado_domicilio", nullable = false)
+    private Boolean habilitadoDomicilio = false;
 }

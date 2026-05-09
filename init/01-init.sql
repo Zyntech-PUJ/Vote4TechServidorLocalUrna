@@ -56,11 +56,12 @@ CREATE TABLE IF NOT EXISTS mesa (
 );
 
 CREATE TABLE IF NOT EXISTS ciudadano (
-    id_ciudadano    BIGSERIAL PRIMARY KEY,
-    nombre          VARCHAR(64) NOT NULL,
-    cedula          VARCHAR(32) NOT NULL UNIQUE,
-    genero          VARCHAR(1),
-    voto_obligatorio BOOLEAN    NOT NULL DEFAULT FALSE
+    id_ciudadano         BIGSERIAL PRIMARY KEY,
+    nombre               VARCHAR(64) NOT NULL,
+    cedula               VARCHAR(32) NOT NULL UNIQUE,
+    genero               VARCHAR(1),
+    voto_obligatorio     BOOLEAN     NOT NULL DEFAULT FALSE,
+    habilitado_domicilio BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
 -- Registro de quién ya votó (se escribe localmente durante la jornada)
@@ -71,3 +72,80 @@ CREATE TABLE IF NOT EXISTS ya_voto (
     timestamp   TIMESTAMP   NOT NULL DEFAULT NOW(),
     CONSTRAINT uq_ya_voto UNIQUE (cedula, id_eleccion)
 );
+
+-- =============================================================
+-- DATOS DE PRUEBA (seed)
+-- =============================================================
+
+-- Partidos
+INSERT INTO partido (nombre, sigla, logo_url) VALUES
+    ('Partido Progresista Nacional', 'PPN', 'https://example.com/logos/ppn.png'),
+    ('Alianza Democrática', 'AD',  'https://example.com/logos/ad.png'),
+    ('Movimiento Ciudadano Unido', 'MCU', 'https://example.com/logos/mcu.png')
+ON CONFLICT DO NOTHING;
+
+-- Centro de votación
+INSERT INTO centro_votacion (nombre, direccion) VALUES
+    ('Colegio Distrital San Martín', 'Calle 45 # 12-30, Bogotá'),
+    ('Universidad Nacional - Bloque B', 'Carrera 30 # 45-03, Bogotá')
+ON CONFLICT DO NOTHING;
+
+-- Mesas: 2 de urna y 1 de domicilio por centro
+INSERT INTO mesa (numero, tipo, activo, id_centro_votacion) VALUES
+    (1,  'URNA',      TRUE, 1),
+    (2,  'URNA',      TRUE, 1),
+    (10, 'DOMICILIO', TRUE, 1),
+    (1,  'URNA',      TRUE, 2),
+    (2,  'URNA',      TRUE, 2),
+    (10, 'DOMICILIO', TRUE, 2)
+ON CONFLICT DO NOTHING;
+
+-- Elección presidencial EN_CURSO
+INSERT INTO eleccion (nombre, fecha_inicio, fecha_finalizacion, tipo, lista_abierta, estado) VALUES
+    ('Elección Presidencial 2025', NOW() - INTERVAL '1 hour', NOW() + INTERVAL '8 hours', 'PRESIDENCIAL', FALSE, 'EN_CURSO')
+ON CONFLICT DO NOTHING;
+
+-- Elección congresional EN_CURSO
+INSERT INTO eleccion (nombre, fecha_inicio, fecha_finalizacion, tipo, lista_abierta, estado) VALUES
+    ('Elección Congresional 2025', NOW() - INTERVAL '1 hour', NOW() + INTERVAL '8 hours', 'CONGRESIONAL', TRUE, 'EN_CURSO')
+ON CONFLICT DO NOTHING;
+
+-- Listas para elección presidencial (id=1, lista cerrada)
+INSERT INTO lista (tipo, id_eleccion) VALUES
+    ('CERRADA', 1),
+    ('CERRADA', 1),
+    ('CERRADA', 1)
+ON CONFLICT DO NOTHING;
+
+-- Listas para elección congresional (id=2, lista abierta)
+INSERT INTO lista (tipo, id_eleccion) VALUES
+    ('ABIERTA', 2),
+    ('ABIERTA', 2)
+ON CONFLICT DO NOTHING;
+
+-- Candidatos presidenciales
+INSERT INTO candidato (nombre, numero, foto_url, activo, id_lista, id_partido) VALUES
+    ('Carlos Mendoza Torres',  '1', 'https://example.com/fotos/mendoza.png',  TRUE, 1, 1),
+    ('Luisa Fernández Vargas', '2', 'https://example.com/fotos/fernandez.png', TRUE, 2, 2),
+    ('Andrés Salazar Muñoz',   '3', 'https://example.com/fotos/salazar.png',   TRUE, 3, 3)
+ON CONFLICT DO NOTHING;
+
+-- Candidatos congresionales
+INSERT INTO candidato (nombre, numero, foto_url, activo, id_lista, id_partido) VALUES
+    ('María Camila Rojas',     '101', 'https://example.com/fotos/rojas.png',     TRUE, 4, 1),
+    ('Felipe Guerrero Leal',   '102', 'https://example.com/fotos/guerrero.png',   TRUE, 4, 1),
+    ('Sandra Patricia Ossa',   '201', 'https://example.com/fotos/ossa.png',       TRUE, 5, 2),
+    ('Jorge Elicer Niño',      '202', 'https://example.com/fotos/nino.png',       TRUE, 5, 2)
+ON CONFLICT DO NOTHING;
+
+-- Ciudadanos: 4 habilitados para URNA, 4 habilitados para DOMICILIO
+INSERT INTO ciudadano (nombre, cedula, genero, voto_obligatorio, habilitado_domicilio) VALUES
+    ('Ana María García López',   '1000100001', 'F', TRUE,  TRUE),
+    ('Carlos Eduardo Ramírez',  '1000100002', 'M', FALSE, TRUE),
+    ('Luisa Fernánda Ospina',   '1000100003', 'F', TRUE,  TRUE),
+    ('Juan Sebastián Morales',  '1000100004', 'M', FALSE, TRUE),
+    ('María Alejandra Torres',  '1000200001', 'F', TRUE,  FALSE),
+    ('Andrés Felipe Castillo',  '1000200002', 'M', FALSE, FALSE),
+    ('Diana Milena Vargas',     '1000200003', 'F', TRUE,  FALSE),
+    ('Roberto Carlos Niño',     '1000200004', 'M', FALSE, FALSE)
+ON CONFLICT (cedula) DO NOTHING;

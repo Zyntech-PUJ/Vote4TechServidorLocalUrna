@@ -8,6 +8,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/ciudadano")
 @RequiredArgsConstructor
@@ -20,5 +22,11 @@ public class CiudadanoController {
     @Operation(summary = "Buscar ciudadano por cédula")
     public ResponseEntity<CiudadanoDto> getByCedula(@PathVariable String cedula) {
         return ResponseEntity.ok(ciudadanoService.findByCedula(cedula));
+    }
+
+    @GetMapping("/domicilio")
+    @Operation(summary = "Listar ciudadanos habilitados para voto domiciliario")
+    public ResponseEntity<List<CiudadanoDto>> getDomicilio() {
+        return ResponseEntity.ok(ciudadanoService.findAllDomicilio());
     }
 }

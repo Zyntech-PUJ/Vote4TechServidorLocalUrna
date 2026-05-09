@@ -7,6 +7,9 @@ import com.vote4tech.servidor.repository.CiudadanoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class CiudadanoService {
@@ -17,12 +20,24 @@ public class CiudadanoService {
         Ciudadano c = ciudadanoRepository.findByCedula(cedula)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ciudadano no encontrado con cédula: " + cedula));
+        return toDto(c);
+    }
+
+    public List<CiudadanoDto> findAllDomicilio() {
+        return ciudadanoRepository.findByHabilitadoDomicilioTrue()
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    private CiudadanoDto toDto(Ciudadano c) {
         CiudadanoDto dto = new CiudadanoDto();
         dto.setIdCiudadano(c.getIdCiudadano());
         dto.setNombre(c.getNombre());
         dto.setCedula(c.getCedula());
         dto.setGenero(c.getGenero());
         dto.setVotoObligatorio(c.getVotoObligatorio());
+        dto.setHabilitadoDomicilio(c.getHabilitadoDomicilio());
         return dto;
     }
 }
