@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+
+  # ──────────────────────────────────────────────
+  # CouchDB — almacena los votos anónimos de urna
+  # ──────────────────────────────────────────────
+  couchdb:
+    image: couchdb:3.3
+    container_name: servidor_urna_couchdb
+    restart: unless-stopped
+    environment:
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: admin123
+    ports:
+      - "5984:5984"
+    volumes:
+      - couchdb-data:/opt/couchdb/data
+    networks:
+      - urna-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://admin:admin123@localhost:5984/_up"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────────
+  # PostgreSQL — réplica local de datos electorales
+  # (ciudadanos, elecciones, candidatos, ya_voto)
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: servidor_urna_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: votacion_local
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init:/docker-entrypoint-initdb.d
+    networks:
+      - urna-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d votacion_local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ──────────────────────────────────────────────
+  # Spring Boot — API REST para las tablets de urna
+  # ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: servidor_urna_backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/votacion_local
+      DB_USER: admin
+      DB_PASSWORD: admin123
+      COUCHDB_URL: http://couchdb:5984
+      COUCHDB_USER: admin
+      COUCHDB_PASSWORD: admin123
+      COUCHDB_DB_URNA: votos_urna
+      SERVER_ADDRESS: 0.0.0.0
+      PORT: 8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      couchdb:
+        condition: service_healthy
+    networks:
+      - urna-network
+
+volumes:
+  couchdb-data:
+  postgres-data:
+
+networks:
+  urna-network:
+    driver: bridge

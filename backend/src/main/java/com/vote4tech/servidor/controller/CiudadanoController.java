@@ -1,0 +1,24 @@
+package com.vote4tech.servidor.controller;
+
+import com.vote4tech.servidor.dto.CiudadanoDto;
+import com.vote4tech.servidor.service.CiudadanoService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/ciudadano")
+@RequiredArgsConstructor
+@Tag(name = "Ciudadano", description = "Validación de electores")
+public class CiudadanoController {
+
+    private final CiudadanoService ciudadanoService;
+
+    @GetMapping("/{cedula}")
+    @Operation(summary = "Buscar ciudadano por cédula")
+    public ResponseEntity<CiudadanoDto> getByCedula(@PathVariable String cedula) {
+        return ResponseEntity.ok(ciudadanoService.findByCedula(cedula));
+    }
+}
