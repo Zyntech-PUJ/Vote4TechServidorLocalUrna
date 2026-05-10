@@ -22,7 +22,14 @@ public class EleccionService {
 
     public List<EleccionDto> findActivas() {
         return eleccionRepository.findByEstado(EstadoEleccion.EN_CURSO)
-                .stream().map(this::toDto).toList();
+                .stream().map(e -> {
+                    EleccionDto dto = toDto(e);
+                    dto.setCandidatos(
+                        candidatoRepository.findByLista_Eleccion_IdEleccionAndActivoTrue(e.getIdEleccion())
+                            .stream().map(this::toCandidatoDto).toList()
+                    );
+                    return dto;
+                }).toList();
     }
 
     public EleccionDto findById(Long id) {
