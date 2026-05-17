@@ -3,6 +3,7 @@ package com.vote4tech.servidor.service;
 import com.vote4tech.servidor.couchdb.CouchDbService;
 import com.vote4tech.servidor.couchdb.VotoDocument;
 import com.vote4tech.servidor.dto.CreateVotoDto;
+import com.vote4tech.servidor.entity.Ciudadano;
 import com.vote4tech.servidor.entity.Eleccion;
 import com.vote4tech.servidor.entity.Mesa;
 import com.vote4tech.servidor.entity.YaVoto;
@@ -34,8 +35,11 @@ public class VotoService {
     @Transactional
     public String votar(CreateVotoDto dto) {
         // 1. Validar ciudadano
-        if (ciudadanoRepository.findByCedula(dto.getCedula()).isEmpty())
-            throw new ResourceNotFoundException("Ciudadano no encontrado con cédula: " + dto.getCedula());
+        Ciudadano ciudadano = ciudadanoRepository.findByCedula(dto.getCedula())
+                .orElseThrow(() -> new ResourceNotFoundException("Ciudadano no encontrado con cédula: " + dto.getCedula()));
+
+        if (Boolean.TRUE.equals(ciudadano.getHabilitadoDomicilio()))
+            throw new BusinessException("El ciudadano está habilitado para voto en domicilio, no en urna.");
 
         // 2. Validar elección activa
         Eleccion eleccion = eleccionRepository.findById(dto.getIdEleccion())

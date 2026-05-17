@@ -30,6 +30,20 @@ public class CiudadanoService {
                 .collect(Collectors.toList());
     }
 
+    public List<CiudadanoDto> findAllUrna() {
+        return ciudadanoRepository.findAll()
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
+    public List<CiudadanoDto> findAll() {
+        return ciudadanoRepository.findAll()
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
+    }
+
     private CiudadanoDto toDto(Ciudadano c) {
         CiudadanoDto dto = new CiudadanoDto();
         dto.setIdCiudadano(c.getIdCiudadano());
@@ -38,6 +52,8 @@ public class CiudadanoService {
         dto.setGenero(c.getGenero());
         dto.setVotoObligatorio(c.getVotoObligatorio());
         dto.setHabilitadoDomicilio(c.getHabilitadoDomicilio());
+        dto.setTipoDocumento(c.getTipoDocumento());
+        dto.setDireccion(c.getDireccion());
         return dto;
     }
 }

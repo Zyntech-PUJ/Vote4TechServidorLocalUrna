@@ -21,7 +21,7 @@ public class EleccionService {
     private final CandidatoRepository candidatoRepository;
 
     public List<EleccionDto> findActivas() {
-        return eleccionRepository.findByEstado(EstadoEleccion.EN_CURSO)
+        return eleccionRepository.findByEstadoIn(List.of(EstadoEleccion.EN_CURSO))
                 .stream().map(e -> {
                     EleccionDto dto = toDto(e);
                     dto.setCandidatos(

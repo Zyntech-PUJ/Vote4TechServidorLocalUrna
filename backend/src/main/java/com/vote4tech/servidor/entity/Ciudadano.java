@@ -25,4 +25,10 @@ public class Ciudadano {
 
     @Column(name = "habilitado_domicilio", nullable = false)
     private Boolean habilitadoDomicilio = false;
+
+    @Column(name = "tipo_documento", nullable = false, length = 32)
+    private String tipoDocumento = "CC";
+
+    @Column(name = "direccion", length = 256)
+    private String direccion;
 }

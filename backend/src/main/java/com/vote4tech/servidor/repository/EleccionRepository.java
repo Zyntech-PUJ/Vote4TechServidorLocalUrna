@@ -7,4 +7,5 @@ import java.util.List;
 
 public interface EleccionRepository extends JpaRepository<Eleccion, Long> {
     List<Eleccion> findByEstado(EstadoEleccion estado);
+    List<Eleccion> findByEstadoIn(List<EstadoEleccion> estados);
 }

@@ -81,6 +81,10 @@ services:
       COUCHDB_DB_URNA: votos_urna
       SERVER_ADDRESS: 0.0.0.0
       PORT: 8080
+      CENTRAL_API_URL: http://host.docker.internal:8084
+      CENTRAL_COUCHDB_URL: http://host.docker.internal:5985
+      CENTRAL_COUCHDB_USER: admin
+      CENTRAL_COUCHDB_PASSWORD: admin123
     depends_on:
       postgres:
         condition: service_healthy

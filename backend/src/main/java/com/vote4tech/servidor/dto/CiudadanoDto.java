@@ -10,4 +10,6 @@ public class CiudadanoDto {
     private String genero;
     private Boolean votoObligatorio;
     private Boolean habilitadoDomicilio;
+    private String tipoDocumento;
+    private String direccion;
 }

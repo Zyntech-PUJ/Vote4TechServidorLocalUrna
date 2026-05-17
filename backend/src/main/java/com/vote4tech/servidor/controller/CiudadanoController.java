@@ -29,4 +29,16 @@ public class CiudadanoController {
     public ResponseEntity<List<CiudadanoDto>> getDomicilio() {
         return ResponseEntity.ok(ciudadanoService.findAllDomicilio());
     }
+
+    @GetMapping("/urna")
+    @Operation(summary = "Listar ciudadanos habilitados para voto en urna (consultas del jurado)")
+    public ResponseEntity<List<CiudadanoDto>> getUrna() {
+        return ResponseEntity.ok(ciudadanoService.findAllUrna());
+    }
+
+    @GetMapping("/todos")
+    @Operation(summary = "Listar todos los ciudadanos")
+    public ResponseEntity<List<CiudadanoDto>> getTodos() {
+        return ResponseEntity.ok(ciudadanoService.findAll());
+    }
 }

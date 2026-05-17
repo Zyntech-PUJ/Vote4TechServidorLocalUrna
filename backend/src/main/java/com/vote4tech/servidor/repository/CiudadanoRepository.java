@@ -8,4 +8,5 @@ import java.util.Optional;
 public interface CiudadanoRepository extends JpaRepository<Ciudadano, Long> {
     Optional<Ciudadano> findByCedula(String cedula);
     List<Ciudadano> findByHabilitadoDomicilioTrue();
+    List<Ciudadano> findByHabilitadoDomicilioFalse();
 }

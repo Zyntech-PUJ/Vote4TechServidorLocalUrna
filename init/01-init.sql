@@ -57,11 +57,13 @@ CREATE TABLE IF NOT EXISTS mesa (
 
 CREATE TABLE IF NOT EXISTS ciudadano (
     id_ciudadano         BIGSERIAL PRIMARY KEY,
-    nombre               VARCHAR(64) NOT NULL,
-    cedula               VARCHAR(32) NOT NULL UNIQUE,
+    nombre               VARCHAR(64)  NOT NULL,
+    cedula               VARCHAR(32)  NOT NULL UNIQUE,
     genero               VARCHAR(1),
-    voto_obligatorio     BOOLEAN     NOT NULL DEFAULT FALSE,
-    habilitado_domicilio BOOLEAN     NOT NULL DEFAULT FALSE
+    voto_obligatorio     BOOLEAN      NOT NULL DEFAULT FALSE,
+    habilitado_domicilio BOOLEAN      NOT NULL DEFAULT FALSE,
+    tipo_documento       VARCHAR(32)  NOT NULL DEFAULT 'CC',
+    direccion            VARCHAR(256)
 );
 
 -- Registro de quién ya votó (se escribe localmente durante la jornada)
@@ -139,13 +141,67 @@ INSERT INTO candidato (nombre, numero, foto_url, activo, id_lista, id_partido) V
 ON CONFLICT DO NOTHING;
 
 -- Ciudadanos: 4 habilitados para URNA, 4 habilitados para DOMICILIO
-INSERT INTO ciudadano (nombre, cedula, genero, voto_obligatorio, habilitado_domicilio) VALUES
-    ('Ana María García López',   '1000100001', 'F', TRUE,  TRUE),
-    ('Carlos Eduardo Ramírez',  '1000100002', 'M', FALSE, TRUE),
-    ('Luisa Fernánda Ospina',   '1000100003', 'F', TRUE,  TRUE),
-    ('Juan Sebastián Morales',  '1000100004', 'M', FALSE, TRUE),
-    ('María Alejandra Torres',  '1000200001', 'F', TRUE,  FALSE),
-    ('Andrés Felipe Castillo',  '1000200002', 'M', FALSE, FALSE),
-    ('Diana Milena Vargas',     '1000200003', 'F', TRUE,  FALSE),
-    ('Roberto Carlos Niño',     '1000200004', 'M', FALSE, FALSE)
+INSERT INTO ciudadano (nombre, cedula, genero, voto_obligatorio, habilitado_domicilio, tipo_documento, direccion) VALUES
+    ('Ana María García López',   '1000100001', 'F', TRUE,  TRUE,  'CC', 'Calle 12 # 45-67, Bogotá'),
+    ('Carlos Eduardo Ramírez',  '1000100002', 'M', FALSE, TRUE,  'CC', 'Carrera 9 # 23-10, Bogotá'),
+    ('Luisa Fernánda Ospina',   '1000100003', 'F', TRUE,  TRUE,  'CC', 'Avenida 68 # 11-22, Bogotá'),
+    ('Juan Sebastián Morales',  '1000100004', 'M', FALSE, TRUE,  'CC', 'Diagonal 45 # 3-15, Bogotá'),
+    ('María Alejandra Torres',  '1000200001', 'F', TRUE,  FALSE, 'CC', 'Calle 80 # 55-20, Bogotá'),
+    ('Andrés Felipe Castillo',  '1000200002', 'M', FALSE, FALSE, 'CC', 'Carrera 15 # 88-40, Bogotá'),
+    ('Diana Milena Vargas',     '1000200003', 'F', TRUE,  FALSE, 'CC', 'Calle 100 # 14-05, Bogotá'),
+    ('Roberto Carlos Niño',     '1000200004', 'M', FALSE, FALSE, 'CC', 'Transversal 20 # 30-11, Bogotá')
 ON CONFLICT (cedula) DO NOTHING;
+
+-- =============================================================
+-- TABLAS DE AUTENTICACIÓN LOCAL
+-- =============================================================
+
+CREATE TABLE IF NOT EXISTS jurado_local (
+    id_jurado  BIGSERIAL   PRIMARY KEY,
+    cedula     VARCHAR(32) NOT NULL UNIQUE,
+    nombre     VARCHAR(64) NOT NULL,
+    password   VARCHAR(255) NOT NULL,
+    activo     BOOLEAN     NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS registrador_local (
+    id_registrador BIGSERIAL   PRIMARY KEY,
+    username       VARCHAR(64) NOT NULL UNIQUE,
+    password       VARCHAR(255) NOT NULL,
+    nombre         VARCHAR(64) NOT NULL,
+    activo         BOOLEAN     NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS funcionario_local (
+    id_funcionario BIGSERIAL   PRIMARY KEY,
+    cedula         VARCHAR(32) NOT NULL UNIQUE,
+    nombre         VARCHAR(64) NOT NULL,
+    password       VARCHAR(255) NOT NULL,
+    activo         BOOLEAN     NOT NULL DEFAULT TRUE
+);
+
+CREATE TABLE IF NOT EXISTS hotspot_config (
+    id       BIGSERIAL    PRIMARY KEY,
+    ssid     VARCHAR(64),
+    password VARCHAR(128),
+    canal    INTEGER      NOT NULL DEFAULT 6,
+    puerto   INTEGER      NOT NULL DEFAULT 8081
+);
+
+-- Datos de prueba: jurado, registrador y funcionarios
+INSERT INTO jurado_local (cedula, nombre, password, activo) VALUES
+    ('9999000001', 'Jurado Principal Mesa 1', 'jurado123', TRUE),
+    ('9999000002', 'Jurado Principal Mesa 2', 'jurado123', TRUE)
+ON CONFLICT (cedula) DO NOTHING;
+
+INSERT INTO registrador_local (username, password, nombre, activo) VALUES
+    ('registrador', 'registrador123', 'Registrador Electoral', TRUE)
+ON CONFLICT (username) DO NOTHING;
+
+INSERT INTO funcionario_local (cedula, nombre, password, activo) VALUES
+    ('8888000001', 'Funcionario Domicilio 1', 'func123', TRUE),
+    ('8888000002', 'Funcionario Domicilio 2', 'func123', TRUE)
+ON CONFLICT (cedula) DO NOTHING;
+
+INSERT INTO hotspot_config (ssid, password, canal, puerto) VALUES
+    ('VotoLocal', 'voto2025', 6, 8081);
