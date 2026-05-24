@@ -2,6 +2,8 @@ package com.vote4tech.servidor.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vote4tech.servidor.dto.sync.DatosElectoralesDto;
+import com.vote4tech.servidor.dto.sync.RegistradorSyncDto;
 import com.vote4tech.servidor.dto.sync.SyncEstadoDto;
 import com.vote4tech.servidor.dto.sync.SyncResultDto;
 import com.vote4tech.servidor.entity.RegistradorLocal;
@@ -12,13 +14,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import java.nio.charset.StandardCharsets;
-import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -32,10 +32,9 @@ import java.util.Set;
 /**
  * Sincronización bidireccional entre el ServidorLocalUrna y el sistema central.
  *
- * Descarga (central BD → local):
- *   Se conecta directamente a la BD central PostgreSQL y copia los datos
- *   electorales (partidos, centros, mesas, elecciones, candidatos, ciudadanos,
- *   registradores) al PostgreSQL local.
+ * Descarga (VotacionBack REST → local PostgreSQL):
+ *   Llama a GET {central.back.url}/sync/datos-electorales y copia los datos
+ *   electorales al PostgreSQL local. No requiere acceso directo a la BD central.
  *
  * Subida (local CouchDB → central CouchDB):
  *   Usa la API de replicación de CouchDB para copiar votos_urna al central.
@@ -45,14 +44,8 @@ public class SyncService {
 
     private static final Logger log = LoggerFactory.getLogger(SyncService.class);
 
-    @Value("${central.db.url:}")
-    private String centralDbUrl;
-
-    @Value("${central.db.username:}")
-    private String centralDbUser;
-
-    @Value("${central.db.password:}")
-    private String centralDbPassword;
+    @Value("${central.back.url:}")
+    private String centralBackUrl;
 
     @Value("${couchdb.url}")
     private String localCouchDbUrl;
@@ -98,10 +91,15 @@ public class SyncService {
 
     public SyncEstadoDto getEstado() {
         boolean accesible = false;
-        if (!centralDbUrl.isBlank()) {
+        if (centralBackUrl != null && !centralBackUrl.isBlank()) {
             try {
-                JdbcTemplate cj = buildCentralJdbc();
-                cj.queryForObject("SELECT 1", Integer.class);
+                RestClient.builder()
+                        .baseUrl(centralBackUrl)
+                        .build()
+                        .get()
+                        .uri("/eleccion/activas")
+                        .retrieve()
+                        .toBodilessEntity();
                 accesible = true;
             } catch (Exception ignored) {}
         }
@@ -121,24 +119,39 @@ public class SyncService {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Descarga: BD central → PostgreSQL local
+    // Descarga: VotacionBack REST API → PostgreSQL local
     // ─────────────────────────────────────────────────────────────────────────
 
     @Transactional
     public SyncResultDto descargar() {
-        if (centralDbUrl == null || centralDbUrl.isBlank()) {
+        if (centralBackUrl == null || centralBackUrl.isBlank()) {
             return SyncResultDto.builder()
                     .exitoso(false)
-                    .mensaje("CENTRAL_DB_URL no configurado. Verifique las variables de entorno.")
+                    .mensaje("CENTRAL_BACK_URL no configurado. Verifique las variables de entorno.")
                     .timestamp(LocalDateTime.now())
                     .build();
         }
 
         try {
-            log.info("Iniciando descarga directa desde BD central: {}", centralDbUrl);
-            JdbcTemplate cj = buildCentralJdbc();
-            cj.queryForObject("SELECT 1", Integer.class);
-            log.info("Conexión a BD central verificada.");
+            log.info("Descargando datos electorales desde VotacionBack: {}", centralBackUrl);
+
+            String responseBody = RestClient.builder()
+                    .baseUrl(centralBackUrl)
+                    .build()
+                    .get()
+                    .uri("/sync/datos-electorales")
+                    .retrieve()
+                    .body(String.class);
+
+            if (responseBody == null || responseBody.isBlank()) {
+                return SyncResultDto.builder()
+                        .exitoso(false)
+                        .mensaje("VotacionBack devolvió respuesta vacía en /sync/datos-electorales.")
+                        .timestamp(LocalDateTime.now())
+                        .build();
+            }
+
+            DatosElectoralesDto datos = objectMapper.readValue(responseBody, DatosElectoralesDto.class);
 
             // Eliminar docs CouchDB locales que ya existen en central (duplicados previos)
             int dupEliminados = limpiarDocumentosLocalesDuplicados();
@@ -150,10 +163,6 @@ public class SyncService {
             Long myCentroAsignado = servidorConfigRepo.findById(1L)
                     .map(c -> c.getIdCentroAsignado()).orElse(null);
 
-            // Asegurar que la columna servidor_id existe en central (ignorar si ya existe)
-            try { cj.execute("ALTER TABLE centro_votacion ADD COLUMN IF NOT EXISTS servidor_id VARCHAR(36)"); }
-            catch (Exception ignored) {}
-
             // Limpiar tablas electorales locales y reiniciar secuencias.
             // ya_voto y tablas de auth no se tocan.
             jdbcTemplate.execute(
@@ -163,148 +172,132 @@ public class SyncService {
 
             int total = 0;
 
-            // 1. Partidos (todos, para no romper FK de candidatos)
-            List<Map<String, Object>> partidos = cj.queryForList(
-                "SELECT id_partido, nombre, sigla FROM partido");
-            for (Map<String, Object> p : partidos) {
-                jdbcTemplate.update(
-                    "INSERT INTO partido (id_partido, nombre, sigla, logo_url) VALUES (?, ?, ?, '')",
-                    p.get("id_partido"), p.get("nombre"), p.get("sigla"));
-                total++;
-            }
-            log.info("Partidos: {}", partidos.size());
-
-            // 2. Centros de votación activos (incluye servidor_id para visibilidad cross-server)
-            List<Map<String, Object>> centros = cj.queryForList(
-                "SELECT id_centro_votacion, nombre, direccion, servidor_id FROM centro_votacion WHERE activo = true");
-            for (Map<String, Object> cv : centros) {
-                jdbcTemplate.update(
-                    "INSERT INTO centro_votacion (id_centro_votacion, nombre, direccion, servidor_id) VALUES (?, ?, ?, ?)",
-                    cv.get("id_centro_votacion"), cv.get("nombre"),
-                    cv.get("direccion") != null ? cv.get("direccion") : "",
-                    cv.get("servidor_id"));
-                total++;
-            }
-            // Restaurar la asignación propia después del truncado
-            if (myServerId != null && myCentroAsignado != null) {
-                jdbcTemplate.update(
-                    "UPDATE centro_votacion SET servidor_id = ? WHERE id_centro_votacion = ?",
-                    myServerId, myCentroAsignado);
-            }
-            log.info("Centros: {}", centros.size());
-
-            // 3. Mesas activas
-            List<Map<String, Object>> mesas = cj.queryForList(
-                "SELECT id_mesa, numero, tipo, activo, id_centro_votacion FROM mesa WHERE activo = true");
-            for (Map<String, Object> m : mesas) {
-                try {
+            // 1. Partidos
+            if (datos.getPartidos() != null) {
+                for (var p : datos.getPartidos()) {
                     jdbcTemplate.update(
-                        "INSERT INTO mesa (id_mesa, numero, tipo, activo, id_centro_votacion) VALUES (?, ?, ?, ?, ?)",
-                        m.get("id_mesa"), m.get("numero"), m.get("tipo"),
-                        m.get("activo"), m.get("id_centro_votacion"));
+                        "INSERT INTO partido (id_partido, nombre, sigla, logo_url) VALUES (?, ?, ?, ?)",
+                        p.getIdPartido(), p.getNombre(), p.getSigla(),
+                        p.getLogoUrl() != null ? p.getLogoUrl() : "");
                     total++;
-                } catch (Exception e) {
-                    log.warn("Mesa {} omitida: {}", m.get("id_mesa"), e.getMessage());
                 }
+                log.info("Partidos: {}", datos.getPartidos().size());
             }
-            log.info("Mesas: {}", mesas.size());
 
-            // 4. Elecciones (todas menos FINALIZADA)
-            List<Map<String, Object>> elecciones = cj.queryForList(
-                "SELECT id_eleccion, nombre, tipo, estado, lista_abierta, " +
-                "fecha_inicio, fecha_finalizacion, fecha_creacion FROM eleccion WHERE estado != 'FINALIZADA'");
-            for (Map<String, Object> e : elecciones) {
-                jdbcTemplate.update(
-                    "INSERT INTO eleccion (id_eleccion, nombre, fecha_inicio, fecha_finalizacion, " +
-                    "fecha_creacion, tipo, lista_abierta, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    e.get("id_eleccion"), e.get("nombre"),
-                    e.get("fecha_inicio"), e.get("fecha_finalizacion"),
-                    e.get("fecha_creacion") != null ? e.get("fecha_creacion") : Timestamp.valueOf(LocalDateTime.now()),
-                    e.get("tipo"), e.get("lista_abierta"), e.get("estado"));
-                total++;
-            }
-            log.info("Elecciones: {}", elecciones.size());
-
-            // 5. Listas de elecciones sincronizadas
-            List<Map<String, Object>> listas = cj.queryForList(
-                "SELECT id_lista, tipo, fecha_creacion, id_eleccion FROM lista " +
-                "WHERE id_eleccion IN (SELECT id_eleccion FROM eleccion WHERE estado != 'FINALIZADA')");
-            for (Map<String, Object> l : listas) {
-                try {
+            // 2. Centros de votación
+            if (datos.getCentrosVotacion() != null) {
+                for (var cv : datos.getCentrosVotacion()) {
                     jdbcTemplate.update(
-                        "INSERT INTO lista (id_lista, tipo, fecha_creacion, id_eleccion) VALUES (?, ?, ?, ?)",
-                        l.get("id_lista"), l.get("tipo"),
-                        l.get("fecha_creacion") != null ? l.get("fecha_creacion") : Timestamp.valueOf(LocalDateTime.now()),
-                        l.get("id_eleccion"));
+                        "INSERT INTO centro_votacion (id_centro_votacion, nombre, direccion, servidor_id) VALUES (?, ?, ?, NULL)",
+                        cv.getIdCentroVotacion(), cv.getNombre(),
+                        cv.getDireccion() != null ? cv.getDireccion() : "");
                     total++;
-                } catch (Exception e) {
-                    log.warn("Lista {} omitida: {}", l.get("id_lista"), e.getMessage());
                 }
-            }
-            log.info("Listas: {}", listas.size());
-
-            // 6. Candidatos — siempre activos localmente (el estado central es workflow admin)
-            List<Map<String, Object>> candidatos = cj.queryForList(
-                "SELECT id_candidato, nombre, numero, id_lista, id_partido FROM candidato " +
-                "WHERE id_lista IN (SELECT id_lista FROM lista WHERE id_eleccion IN " +
-                "(SELECT id_eleccion FROM eleccion WHERE estado != 'FINALIZADA'))");
-            for (Map<String, Object> c : candidatos) {
-                try {
+                // Restaurar la asignación propia después del truncado
+                if (myServerId != null && myCentroAsignado != null) {
                     jdbcTemplate.update(
-                        "INSERT INTO candidato (id_candidato, nombre, numero, foto_url, activo, id_lista, id_partido) VALUES (?, ?, ?, '', true, ?, ?)",
-                        c.get("id_candidato"), c.get("nombre"), c.get("numero"),
-                        c.get("id_lista"), c.get("id_partido"));
-                    total++;
-                } catch (Exception e) {
-                    log.warn("Candidato {} omitido: {}", c.get("id_candidato"), e.getMessage());
+                        "UPDATE centro_votacion SET servidor_id = ? WHERE id_centro_votacion = ?",
+                        myServerId, myCentroAsignado);
                 }
+                log.info("Centros: {}", datos.getCentrosVotacion().size());
             }
-            log.info("Candidatos: {}", candidatos.size());
+
+            // 3. Mesas
+            if (datos.getMesas() != null) {
+                for (var m : datos.getMesas()) {
+                    try {
+                        jdbcTemplate.update(
+                            "INSERT INTO mesa (id_mesa, numero, tipo, activo, id_centro_votacion) VALUES (?, ?, ?, ?, ?)",
+                            m.getIdMesa(), m.getNumero(), m.getTipo(),
+                            m.getActivo() != null ? m.getActivo() : true,
+                            m.getIdCentroVotacion());
+                        total++;
+                    } catch (Exception e) {
+                        log.warn("Mesa {} omitida: {}", m.getIdMesa(), e.getMessage());
+                    }
+                }
+                log.info("Mesas: {}", datos.getMesas().size());
+            }
+
+            // 4. Elecciones
+            if (datos.getElecciones() != null) {
+                for (var e : datos.getElecciones()) {
+                    jdbcTemplate.update(
+                        "INSERT INTO eleccion (id_eleccion, nombre, fecha_inicio, fecha_finalizacion, " +
+                        "fecha_creacion, tipo, lista_abierta, estado) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        e.getIdEleccion(), e.getNombre(),
+                        e.getFechaInicio(), e.getFechaFinalizacion(),
+                        e.getFechaCreacion() != null ? e.getFechaCreacion() : LocalDateTime.now(),
+                        e.getTipo(), e.getListaAbierta(), e.getEstado());
+                    total++;
+                }
+                log.info("Elecciones: {}", datos.getElecciones().size());
+            }
+
+            // 5. Listas
+            if (datos.getListas() != null) {
+                for (var l : datos.getListas()) {
+                    try {
+                        jdbcTemplate.update(
+                            "INSERT INTO lista (id_lista, tipo, fecha_creacion, id_eleccion) VALUES (?, ?, ?, ?)",
+                            l.getIdLista(), l.getTipo(),
+                            l.getFechaCreacion() != null ? l.getFechaCreacion() : LocalDateTime.now(),
+                            l.getIdEleccion());
+                        total++;
+                    } catch (Exception e) {
+                        log.warn("Lista {} omitida: {}", l.getIdLista(), e.getMessage());
+                    }
+                }
+                log.info("Listas: {}", datos.getListas().size());
+            }
+
+            // 6. Candidatos
+            if (datos.getCandidatos() != null) {
+                for (var c : datos.getCandidatos()) {
+                    try {
+                        jdbcTemplate.update(
+                            "INSERT INTO candidato (id_candidato, nombre, numero, foto_url, activo, id_lista, id_partido) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            c.getIdCandidato(), c.getNombre(), c.getNumero(),
+                            c.getFotoUrl() != null ? c.getFotoUrl() : "",
+                            c.getActivo() != null ? c.getActivo() : true,
+                            c.getIdLista(), c.getIdPartido());
+                        total++;
+                    } catch (Exception e) {
+                        log.warn("Candidato {} omitido: {}", c.getIdCandidato(), e.getMessage());
+                    }
+                }
+                log.info("Candidatos: {}", datos.getCandidatos().size());
+            }
 
             // 7. Ciudadanos
-            List<Map<String, Object>> ciudadanos = cj.queryForList(
-                "SELECT id_ciudadano, nombre, cedula, genero, voto_obligatorio, habilitado_domicilio FROM ciudadano");
-            for (Map<String, Object> c : ciudadanos) {
-                jdbcTemplate.update(
-                    "INSERT INTO ciudadano (id_ciudadano, nombre, cedula, genero, voto_obligatorio, habilitado_domicilio, tipo_documento) VALUES (?, ?, ?, ?, ?, ?, 'CC')",
-                    c.get("id_ciudadano"), c.get("nombre"), c.get("cedula"), c.get("genero"),
-                    c.get("voto_obligatorio"), c.get("habilitado_domicilio"));
-                total++;
+            if (datos.getCiudadanos() != null) {
+                for (var c : datos.getCiudadanos()) {
+                    jdbcTemplate.update(
+                        "INSERT INTO ciudadano (id_ciudadano, nombre, cedula, genero, voto_obligatorio, habilitado_domicilio, tipo_documento) VALUES (?, ?, ?, ?, ?, ?, 'CC')",
+                        c.getIdCiudadano(), c.getNombre(), c.getCedula(), c.getGenero(),
+                        c.getVotoObligatorio() != null ? c.getVotoObligatorio() : false,
+                        c.getHabilitadoDomicilio() != null ? c.getHabilitadoDomicilio() : false);
+                    total++;
+                }
+                log.info("Ciudadanos: {}", datos.getCiudadanos().size());
             }
-            log.info("Ciudadanos: {}", ciudadanos.size());
 
             // 8. Registradores (upsert por username, no se truncan)
-            List<Map<String, Object>> registradores = cj.queryForList(
-                "SELECT nombre, usuario, password FROM registrador");
-            for (Map<String, Object> r : registradores) {
-                String username = (String) r.get("usuario");
-                RegistradorLocal reg = registradorRepo.findByUsernameAndActivoTrue(username)
-                        .orElse(RegistradorLocal.builder().build());
-                reg.setUsername(username);
-                reg.setPassword((String) r.get("password"));
-                reg.setNombre((String) r.get("nombre"));
-                reg.setActivo(true);
-                registradorRepo.save(reg);
-                total++;
+            if (datos.getRegistradores() != null) {
+                for (RegistradorSyncDto r : datos.getRegistradores()) {
+                    RegistradorLocal reg = registradorRepo.findByUsernameAndActivoTrue(r.getUsuario())
+                            .orElse(RegistradorLocal.builder().build());
+                    reg.setUsername(r.getUsuario());
+                    reg.setPassword(r.getPasswordHash());
+                    reg.setNombre(r.getNombre());
+                    reg.setActivo(true);
+                    registradorRepo.save(reg);
+                    total++;
+                }
+                log.info("Registradores: {}", datos.getRegistradores().size());
             }
-            log.info("Registradores: {}", registradores.size());
 
-            // 9. Jurados (upsert por cedula — contraseña por defecto jurado123 si es nuevo)
-            List<Map<String, Object>> jurados = cj.queryForList(
-                "SELECT DISTINCT c.cedula, c.nombre FROM eleccion_jurado ej " +
-                "JOIN ciudadano c ON c.id_ciudadano = ej.id_ciudadano " +
-                "WHERE ej.id_eleccion IN (SELECT id_eleccion FROM eleccion WHERE estado != 'FINALIZADA')");
-            for (Map<String, Object> j : jurados) {
-                jdbcTemplate.update(
-                    "INSERT INTO jurado_local (cedula, nombre, password, activo) " +
-                    "VALUES (?, ?, 'jurado123', true) " +
-                    "ON CONFLICT (cedula) DO UPDATE SET nombre = EXCLUDED.nombre, activo = true",
-                    j.get("cedula"), j.get("nombre"));
-                total++;
-            }
-            log.info("Jurados: {}", jurados.size());
-
-            // 10. Votos del CouchDB central → CouchDB local
+            // 9. Votos del CouchDB central → CouchDB local
             int votosDescargados = 0;
             String msgVotos = "";
             if (centralCouchDbUrl != null && !centralCouchDbUrl.isBlank()) {
@@ -323,13 +316,13 @@ public class SyncService {
 
             return SyncResultDto.builder()
                     .exitoso(true)
-                    .mensaje("Descarga completada desde BD central." + msgVotos)
+                    .mensaje("Descarga completada desde VotacionBack." + msgVotos)
                     .timestamp(ultimaDescarga)
                     .registrosProcesados(total)
                     .build();
 
         } catch (Exception e) {
-            log.error("Error durante la descarga directa desde BD central", e);
+            log.error("Error durante la descarga desde VotacionBack", e);
             return SyncResultDto.builder()
                     .exitoso(false)
                     .mensaje(clasificarError(e, "descarga"))
@@ -453,7 +446,7 @@ public class SyncService {
     /**
      * Lee todos los docs de votos_urna local y los sube directamente al CouchDB central
      * usando _bulk_docs. Spring Boot hace las llamadas HTTP (no el contenedor CouchDB),
-     * lo que evita problemas de red del contenedor hacia el túnel SSH del host.
+     * lo que evita problemas de red del contenedor hacia el túnel del host.
      *
      * @return número de votos que quedaron en central (nuevos + ya existían)
      * @throws Exception si hay error de red/IO (para que subir() lo clasifique)
@@ -720,7 +713,7 @@ public class SyncService {
         if (full.contains("connection refused") || full.contains("connect") || full.contains("timeout")
                 || full.contains("i/o error") || full.contains("network") || full.contains("unreachable")) {
             return "Sin conexión al sistema central durante " + operacion +
-                   ". Verifique la red y que los túneles SSH estén activos. (" + e.getClass().getSimpleName() + ")";
+                   ". Verifique que VotacionBack esté accesible. (" + e.getClass().getSimpleName() + ")";
         }
         if (full.contains("password") || full.contains("authentication") || full.contains("unauthorized")
                 || full.contains("401") || full.contains("auth")) {
@@ -732,15 +725,6 @@ public class SyncService {
                    ". Verifique el nombre de la BD en la configuración.";
         }
         return "Error durante " + operacion + ": " + e.getMessage();
-    }
-
-    private JdbcTemplate buildCentralJdbc() {
-        DriverManagerDataSource ds = new DriverManagerDataSource();
-        ds.setDriverClassName("org.postgresql.Driver");
-        ds.setUrl(centralDbUrl);
-        ds.setUsername(centralDbUser);
-        ds.setPassword(centralDbPassword);
-        return new JdbcTemplate(ds);
     }
 
     private int contarDocumentosCouchDb(String db) {

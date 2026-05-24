@@ -81,10 +81,8 @@ services:
       COUCHDB_DB_URNA: votos_urna
       SERVER_ADDRESS: 0.0.0.0
       PORT: 8080
-      CENTRAL_DB_URL: jdbc:postgresql://host.docker.internal:15434/bd_nacional_vote4tech
-      CENTRAL_DB_USER: admin_db_nacional
-      CENTRAL_DB_PASSWORD: "12345"
-      CENTRAL_COUCHDB_URL: http://host.docker.internal:15985
+      CENTRAL_BACK_URL: https://genome-sale-tomatoes-inserted.trycloudflare.com
+      CENTRAL_COUCHDB_URL: https://charm-maternity-poems-subjects.trycloudflare.com
     depends_on:
       postgres:
         condition: service_healthy
