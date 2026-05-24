@@ -81,10 +81,10 @@ services:
       COUCHDB_DB_URNA: votos_urna
       SERVER_ADDRESS: 0.0.0.0
       PORT: 8080
-      CENTRAL_API_URL: http://host.docker.internal:8084
-      CENTRAL_COUCHDB_URL: http://host.docker.internal:5985
-      CENTRAL_COUCHDB_USER: admin
-      CENTRAL_COUCHDB_PASSWORD: admin123
+      CENTRAL_DB_URL: jdbc:postgresql://host.docker.internal:15434/bd_nacional_vote4tech
+      CENTRAL_DB_USER: admin_db_nacional
+      CENTRAL_DB_PASSWORD: "12345"
+      CENTRAL_COUCHDB_URL: http://host.docker.internal:15985
     depends_on:
       postgres:
         condition: service_healthy

@@ -3,383 +3,509 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Servidor Local Urna — Configuración</title>
+<title>Servidor Local Urna</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
-  header { background: #16213e; color: #fff; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
-  header h1 { font-size: 1.2rem; font-weight: 600; }
-  .badge { background: #e94560; padding: 2px 8px; border-radius: 12px; font-size: .75rem; }
-  main { max-width: 640px; margin: 40px auto; padding: 0 16px; }
-  .card { background: #fff; border-radius: 12px; padding: 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.08); }
-  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 20px; color: #16213e; display: flex; align-items: center; gap: 8px; }
+  header { background: #16213e; color: #fff; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 1.15rem; font-weight: 600; }
+  .badge { background: #e94560; padding: 2px 10px; border-radius: 12px; font-size: .75rem; }
+  .badge.online { background: #28a745; }
+  #header-user { display: flex; align-items: center; gap: 12px; }
+  #header-user span { font-size: .88rem; color: #ccc; }
+  #btn-logout { background: transparent; border: 1px solid #e94560; color: #e94560; border-radius: 8px; padding: 4px 12px; font-size: .8rem; cursor: pointer; }
+  #btn-logout:hover { background: #e94560; color: #fff; }
+  #login-view { display: flex; justify-content: center; align-items: center; min-height: calc(100vh - 52px); }
+  .login-card { background: #fff; border-radius: 16px; padding: 40px; width: 360px; box-shadow: 0 4px 20px rgba(0,0,0,.12); }
+  .login-card h2 { font-size: 1.3rem; margin-bottom: 6px; color: #16213e; }
+  .login-card p  { font-size: .85rem; color: #777; margin-bottom: 24px; }
+  #dashboard-view { display: none; }
+  .tabs { background: #fff; border-bottom: 2px solid #eee; padding: 0 24px; display: flex; gap: 4px; }
+  .tab-btn { background: none; border: none; border-bottom: 3px solid transparent; padding: 14px 20px; font-size: .9rem; cursor: pointer; color: #666; margin-bottom: -2px; transition: color .2s, border-color .2s; }
+  .tab-btn:hover { color: #16213e; }
+  .tab-btn.active { color: #e94560; border-bottom-color: #e94560; font-weight: 600; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  main { max-width: 860px; margin: 32px auto; padding: 0 20px; }
+  .card { background: #fff; border-radius: 12px; padding: 28px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,.07); }
+  h2 { font-size: 1rem; font-weight: 600; margin-bottom: 18px; color: #16213e; display: flex; align-items: center; gap: 8px; }
   label { display: block; font-size: .85rem; color: #555; margin-bottom: 4px; margin-top: 12px; }
-  input { width: 100%; padding: 10px 12px; border: 1px solid #dde; border-radius: 8px; font-size: 1rem; outline: none; transition: border .2s; }
+  input[type="text"], input[type="password"], input[type="number"] { width: 100%; padding: 10px 12px; border: 1px solid #dde; border-radius: 8px; font-size: 1rem; outline: none; transition: border .2s; }
   input:focus { border-color: #e94560; }
-  button { background: #e94560; color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: .95rem; cursor: pointer; width: 100%; margin-top: 16px; transition: background .2s; }
+  button { background: #e94560; color: #fff; border: none; border-radius: 8px; padding: 11px 22px; font-size: .95rem; cursor: pointer; width: 100%; margin-top: 16px; transition: background .2s; }
   button:hover { background: #c73652; }
   button.secondary { background: #16213e; }
   button.secondary:hover { background: #0e1a30; }
+  button.sm { width: auto; padding: 6px 14px; font-size: .82rem; margin-top: 0; }
   .msg { margin-top: 12px; padding: 10px 14px; border-radius: 8px; font-size: .9rem; display: none; }
   .msg.ok  { background: #d4edda; color: #155724; }
   .msg.err { background: #f8d7da; color: #721c24; }
-  #devices-section { display: none; }
   table { width: 100%; border-collapse: collapse; font-size: .88rem; }
   th { background: #f5f7fa; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #eee; }
   td { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; }
   tr:hover td { background: #fafafa; }
-  .chip { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: .75rem; font-weight: 600; }
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .75rem; font-weight: 600; }
   .chip.on  { background: #d4edda; color: #155724; }
   .chip.off { background: #f8d7da; color: #721c24; }
-  .section-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
-  .section-tabs button { width: auto; padding: 8px 20px; border-radius: 20px; font-size: .85rem; margin-top: 0; }
-  .section-tabs button.active { background: #16213e; }
-  .section-tabs button:not(.active) { background: #aaa; }
-  #ciudadanos-table-wrap { overflow-x: auto; }
   .search-bar { width: 100%; padding: 10px 12px; border: 1px solid #dde; border-radius: 8px; font-size: .95rem; margin-bottom: 16px; outline: none; }
   .search-bar:focus { border-color: #e94560; }
+  .alert-box { background: #fff3cd; border: 1px solid #ffc107; border-radius: 10px; padding: 20px 24px; text-align: center; color: #664d03; }
+  .alert-box p { margin-top: 8px; font-size: .9rem; line-height: 1.6; }
+  .alert-box a { color: #e94560; cursor: pointer; text-decoration: underline; font-weight: 600; }
+  .paso { display: flex; gap: 16px; align-items: flex-start; padding: 16px; background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 12px; }
+  .paso-num { min-width: 36px; height: 36px; border-radius: 8px; background: #16213e; color: #fff; font-weight: 700; font-size: 1rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .paso-body h3 { font-size: .95rem; font-weight: 600; margin-bottom: 4px; color: #16213e; }
+  .paso-body p { font-size: .87rem; color: #555; line-height: 1.6; }
+  .paso-body code { background: #f0f2f5; padding: 1px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: .85rem; }
+  .paso-body strong { color: #16213e; }
+  .centros-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; margin-top: 8px; }
+  .centro-card { border-radius: 12px; padding: 20px; cursor: pointer; transition: transform .15s, box-shadow .15s; border: 2px solid transparent; position: relative; }
+  .centro-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,.13); }
+  .centro-card.disponible { background: #f0faf4; border-color: #28a745; }
+  .centro-card.propio { background: #e8f0fe; border-color: #1565c0; }
+  .centro-card.ocupado { background: #f7f7f7; border-color: #ccc; cursor: not-allowed; opacity: .7; }
+  .centro-card h3 { font-size: .97rem; font-weight: 700; margin-bottom: 4px; color: #16213e; }
+  .centro-card p  { font-size: .82rem; color: #666; margin-bottom: 10px; }
+  .estado-chip { display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: .75rem; font-weight: 700; letter-spacing: .3px; }
+  .estado-chip.disponible { background: #28a745; color: #fff; }
+  .estado-chip.propio     { background: #1565c0; color: #fff; }
+  .estado-chip.ocupado    { background: #888; color: #fff; }
+  .mesas-badge { position: absolute; top: 14px; right: 14px; background: #16213e; color: #fff; border-radius: 20px; padding: 2px 10px; font-size: .73rem; }
+  #centro-banner { background: #e8f0fe; border: 1px solid #1565c0; border-radius: 10px; padding: 14px 18px; margin-bottom: 18px; display: none; }
+  #centro-banner p { font-size: .9rem; color: #1565c0; margin: 0; }
+  #centro-banner span { font-weight: 700; }
+  #btn-liberar-centro { display: inline-block; margin-top: 8px; padding: 5px 14px; font-size: .8rem; width: auto; background: #e94560; margin-top: 8px; }
+  #conflictos-overlay { position:fixed; inset:0; background:rgba(0,0,0,.72); display:none; align-items:center; justify-content:center; z-index:9999; }
+  .conflictos-box { background:#fff3cd; border:2px solid #ffc107; border-radius:16px; padding:36px 40px; max-width:460px; width:90%; text-align:center; color:#664d03; box-shadow:0 12px 40px rgba(0,0,0,.4); }
+  .conflictos-box h3 { font-size:1.1rem; font-weight:700; margin-bottom:14px; color:#856404; }
+  .conflictos-box p { font-size:.9rem; line-height:1.7; margin-bottom:22px; }
+  .conflictos-timer { font-size:2.6rem; font-weight:800; color:#e94560; line-height:1; }
+  .conflictos-note { font-size:.78rem; color:#9a7714; margin-top:10px; }
 </style>
 </head>
 <body>
+
 <header>
-  <div>
-    <h1>🗳️ Servidor Local de Urna</h1>
+  <h1>&#128379; Servidor Local de Urna</h1>
+  <div id="header-user" style="display:none;">
+    <span id="header-nombre"></span>
+    <span class="badge" id="status-badge">desconectado</span>
+    <button id="btn-logout" onclick="logout()">Cerrar sesion</button>
   </div>
-  <span class="badge" id="status-badge">desconectado</span>
+  <span class="badge" id="status-badge-login">desconectado</span>
 </header>
 
-<main>
-
-  <!-- ─── SECCIÓN CONFIG ─── -->
-  <div id="config-section">
-    <div class="card">
-      <h2>⚙️ Configuración del Hotspot WiFi</h2>
-      <label>Nombre de red (SSID)</label>
-      <input id="ssid" type="text" placeholder="VotoLocal" />
-      <label>Contraseña WiFi</label>
-      <input id="wifi-pass" type="text" placeholder="voto2025" />
-      <label>Canal (1-13)</label>
-      <input id="canal" type="number" min="1" max="13" value="6" />
-      <label>Puerto del servidor</label>
-      <input id="puerto" type="number" value="8081" />
-      <button onclick="guardarConfig()">💾 Guardar configuración</button>
-      <div class="msg" id="config-msg"></div>
-    </div>
-
-    <div class="card" style="text-align:center;">
-      <h2>📡 Ver dispositivos conectados</h2>
-      <p style="color:#777; font-size:.9rem; margin-bottom:16px;">
-        Muestra los dispositivos actualmente conectados al hotspot de este servidor.
-      </p>
-      <button class="secondary" onclick="mostrarDispositivos()">🔍 Ver dispositivos</button>
-    </div>
+<div id="login-view">
+  <div class="login-card">
+    <h2>&#128272; Iniciar sesion</h2>
+    <p>Acceso para registradores electorales y jurados de votacion.</p>
+    <label>Usuario / Cedula</label>
+    <input id="l-user" type="text" placeholder="Usuario o numero de cedula" />
+    <label>Contrasena</label>
+    <input id="l-pass" type="password" placeholder="&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;" />
+    <button onclick="loginUnificado()">Entrar</button>
+    <div class="msg" id="login-msg"></div>
   </div>
+</div>
 
-  <!-- ─── SECCIÓN DISPOSITIVOS ─── -->
-  <div id="devices-section">
-    <div class="card">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-        <h2 style="margin:0">📱 Dispositivos conectados</h2>
-        <button class="secondary" style="width:auto; margin:0; padding:8px 16px;" onclick="verConfig()">← Volver</button>
-      </div>
-      <div id="devices-list">
-        <p style="color:#aaa; text-align:center; padding: 24px 0;">Cargando...</p>
-      </div>
-      <div style="display:flex;gap:8px;margin-top:8px;">
-        <button onclick="refrescarDispositivos()" style="background:#555;">🔄 Refrescar</button>
-        <button onclick="desconectarTodos()" style="background:#b71c1c;">🔌 Desconectar todos</button>
-      </div>
-    </div>
+<div id="dashboard-view">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('ciudadanos')">&#128101; Ciudadanos</button>
+    <button class="tab-btn" onclick="showTab('centro')">&#127979; Centro de Votacion</button>
+    <button class="tab-btn" onclick="showTab('sincronizacion')">&#128260; Sincronizacion</button>
+    <button class="tab-btn" onclick="showTab('instrucciones')">&#128203; Instrucciones</button>
+  </div>
+  <main>
 
-    <!-- Consultas del jurado -->
-    <div class="card">
-      <h2>🔎 Consultas del jurado</h2>
-      <div id="consultas-login-wrap">
-        <label>Cédula del jurado</label>
-        <input id="j-cedula" type="text" placeholder="9999000001" />
-        <label>Contraseña</label>
-        <input id="j-pass" type="password" placeholder="••••••••" />
-        <button onclick="loginJurado()">🔑 Ingresar</button>
-        <div class="msg" id="login-msg"></div>
-      </div>
-
-      <div id="consultas-wrap" style="display:none;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-          <strong id="jurado-nombre"></strong>
-          <button class="secondary" style="width:auto; margin:0; padding:6px 14px; font-size:.8rem;" onclick="cerrarConsultas()">Cerrar sesión</button>
-        </div>
-        <input class="search-bar" id="busqueda" oninput="filtrarCiudadanos()" placeholder="🔍  Buscar por nombre o cédula..." />
-        <div id="ciudadanos-table-wrap">
+    <!-- ===== CIUDADANOS ===== -->
+    <div class="tab-panel active" id="tab-ciudadanos">
+      <div class="card">
+        <h2>&#128101; Ciudadanos habilitados</h2>
+        <input class="search-bar" id="busqueda" oninput="filtrarCiudadanos()" placeholder="Buscar por nombre o cedula..." />
+        <div style="overflow-x:auto;">
           <table>
-            <thead><tr><th>Nombre</th><th>Cédula</th><th>Tipo Doc</th><th>Dirección</th><th>Habilitado</th></tr></thead>
-            <tbody id="ciudadanos-tbody"></tbody>
+            <thead><tr><th>Nombre</th><th>Cedula</th><th>Tipo Doc</th><th>Direccion</th><th>Habilitado</th></tr></thead>
+            <tbody id="ciudadanos-tbody"><tr><td colspan="5" style="text-align:center;color:#aaa;padding:24px 0">Cargando...</td></tr></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- Sincronización con sistema central -->
-    <div class="card">
-      <h2>🔄 Sincronización central</h2>
-
-      <!-- Estado -->
-      <div id="sync-estado" style="background:#1e1e1e; border-radius:6px; padding:12px; margin-bottom:16px; font-size:.85rem; line-height:1.6;">
-        <span style="color:#aaa;">Cargando estado...</span>
+    <!-- ===== CENTRO DE VOTACION ===== -->
+    <div class="tab-panel" id="tab-centro">
+      <div class="card">
+        <h2>&#127979; Centro de Votacion asignado a este servidor</h2>
+        <div id="centro-banner">
+          <p>Centro activo: <span id="centro-nombre-actual"></span> &mdash; <span id="centro-dir-actual" style="font-weight:normal;"></span></p>
+          <button id="btn-liberar-centro" onclick="liberarCentro()">Liberar asignacion</button>
+        </div>
+        <p style="font-size:.87rem;color:#555;margin-bottom:16px;">Selecciona el centro de votacion que gestionara este servidor. Las tablets de urna solo veran las mesas de ese centro. Solo un servidor puede reclamar cada centro.</p>
+        <div id="centros-grid" class="centros-grid"><p style="color:#aaa;">Cargando centros...</p></div>
       </div>
-
-      <!-- Acciones -->
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <button onclick="syncDescargar()" style="background:#1565c0; flex:1; min-width:180px;">
-          📥 Descargar datos electorales
-        </button>
-        <button onclick="syncSubir()" style="background:#2e7d32; flex:1; min-width:180px;">
-          📤 Subir votos al central
-        </button>
-        <button onclick="syncEstado()" style="background:#555; flex:1; min-width:120px; padding:6px 10px; font-size:.8rem;">
-          🔍 Actualizar estado
-        </button>
-      </div>
-
-      <!-- Resultado de la última operación -->
-      <div id="sync-result" style="display:none; margin-top:14px; padding:10px 14px; border-radius:6px; font-size:.85rem;"></div>
     </div>
-  </div>
 
-</main>
+    <!-- ===== SINCRONIZACION ===== -->
+    <div class="tab-panel" id="tab-sincronizacion">
+      <div class="card">
+        <h2>&#128260; Sincronizacion con sistema central</h2>
+        <div id="sync-estado" style="background:#1e1e1e;border-radius:6px;padding:14px;margin-bottom:16px;font-size:.85rem;line-height:1.7;color:#ccc;">Cargando estado...</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button onclick="syncDescargar()" style="background:#1565c0;flex:1;min-width:180px;">Descargar datos electorales</button>
+          <button onclick="syncSubir()"     style="background:#2e7d32;flex:1;min-width:180px;">Subir votos al central</button>
+          <button onclick="syncEstado()"    style="background:#555;flex:1;min-width:120px;padding:8px 10px;font-size:.82rem;">Actualizar estado</button>
+        </div>
+        <div id="sync-result" style="display:none;margin-top:14px;padding:10px 14px;border-radius:6px;font-size:.85rem;"></div>
+      </div>
+    </div>
+
+    <!-- ===== INSTRUCCIONES ===== -->
+    <div class="tab-panel" id="tab-instrucciones">
+      <div class="card">
+        <h2>&#128203; Como preparar la jornada de votacion</h2>
+
+        <div class="paso">
+          <div class="paso-num">1</div>
+          <div class="paso-body">
+            <h3>&#128241; Crear la red WiFi en el celular del hotspot</h3>
+            <p>Toma un celular Android (el que hara de punto de acceso). Ve a <strong>Ajustes &rarr; Conexiones &rarr; Zona WiFi</strong> (o "Punto de acceso movil", segun la marca). Activa el interruptor y configura la red con estos datos:<br><br>
+            &bull; <strong>Nombre de la red (SSID):</strong> <code>Vote4Tech_Urna</code><br>
+            &bull; <strong>Contrasena:</strong> <code>voto2025</code><br><br>
+            Usa siempre estos mismos datos para que el sistema funcione correctamente.</p>
+          </div>
+        </div>
+
+        <div class="paso">
+          <div class="paso-num">2</div>
+          <div class="paso-body">
+            <h3>&#128187; Conectar el portatil del servidor a la red</h3>
+            <p>En el portatil donde corre el servidor, abre la lista de redes WiFi y conectate a <strong>Vote4Tech_Urna</strong> con la contrasena <code>voto2025</code>. Asegurate de tener buena senal.</p>
+          </div>
+        </div>
+
+        <div class="paso">
+          <div class="paso-num">3</div>
+          <div class="paso-body">
+            <h3>&#128230; Levantar el servidor Docker</h3>
+            <p>Abre <strong>PowerShell</strong> en la carpeta <code>Vote4TechServidorLocalUrna</code> y ejecuta:<br><br>
+            <code>docker compose up -d</code><br><br>
+            Espera entre <strong>30 y 60 segundos</strong> mientras los contenedores inician.<br><br>
+            <strong>&#9888;&#65039; Importante:</strong> el portatil debe tener <strong>conexion a internet</strong> en este momento, porque el servidor descarga automaticamente los datos electorales del sistema central al arrancar. Sin internet, la sincronizacion fallara y deberas hacerla manual desde la pestana Sincronizacion una vez tengas conexion.<br><br>
+            Cuando esten listos, abre esta misma pagina en el navegador usando la IP del portatil en la red, por ejemplo:<br><br>
+            <code>http://192.168.43.21:8081</code><br><br>
+            Puedes ver la IP del portatil ejecutando <code>ipconfig</code> en PowerShell y buscando el adaptador de red inalambrica.</p>
+          </div>
+        </div>
+
+        <div class="paso">
+          <div class="paso-num">4</div>
+          <div class="paso-body">
+            <h3>&#128241; Conectar la tablet de urna a la red</h3>
+            <p>En cada tablet o celular que se usara para votar, ve a <strong>Ajustes &rarr; WiFi</strong> y conectate a la red <strong>Vote4Tech_Urna</strong> con la contrasena <code>voto2025</code>.</p>
+          </div>
+        </div>
+
+        <div class="paso">
+          <div class="paso-num">5</div>
+          <div class="paso-body">
+            <h3>&#9881;&#65039; Configurar la app de urna</h3>
+            <p>En la app de urna, desde la pantalla de identificacion toca el boton <strong>&#9881;&#65039; Configuracion</strong> para iniciar sesion con tus credenciales. Luego en el panel de administracion toca <strong>Conexion al Servidor</strong>, escribe la URL del portatil (por ejemplo <code>http://192.168.43.21:8081</code>), toca <strong>Conectar y cargar mesas</strong>, selecciona tu mesa y guarda.</p>
+          </div>
+        </div>
+
+        <div class="paso">
+          <div class="paso-num">6</div>
+          <div class="paso-body">
+            <h3>&#128260; Verificar la sincronizacion de datos</h3>
+            <p>El servidor sincroniza los datos electorales <strong>automaticamente al arrancar</strong> (si habia conexion a internet en ese momento). Puedes verificarlo en la pestana <strong>Sincronizacion</strong>: si la <em>Ultima descarga</em> muestra una fecha reciente, todo esta listo.<br><br>
+            Si la sincronizacion automatica fallo (por falta de internet al arrancar), conecta el portatil a internet y usa el boton <strong>Descargar datos electorales</strong> para hacerlo manualmente. Esto es necesario antes de empezar la jornada.</p>
+          </div>
+        </div>
+
+        <div class="paso">
+          <div class="paso-num">7</div>
+          <div class="paso-body">
+            <h3>&#128228; Al terminar la jornada: subir los votos</h3>
+            <p>Cuando la jornada haya terminado, en la pestana <strong>Sincronizacion</strong> toca <strong>Subir votos al central</strong>. Esto envia todos los votos registrados localmente al sistema central. Asegurate de tener conexion al sistema central antes de hacerlo.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<div id="conflictos-overlay">
+  <div class="conflictos-box">
+    <h3>&#9888;&#65039; Conflicto de votos detectado</h3>
+    <p id="conflictos-msg"></p>
+    <div class="conflictos-timer" id="conflictos-countdown">6</div>
+    <div class="conflictos-note">La accion continuara automaticamente...</div>
+  </div>
+</div>
 
 <script>
-const API = '';  // mismo origen
+const API = '';
 let ciudadanosCache = [];
+let userRole = null;
+let userName = '';
 
-// ─── SINCRONIZACIÓN ──────────────────────────────
-async function syncEstado() {
-  const el = document.getElementById('sync-estado');
+async function loginUnificado() {
+  const user = document.getElementById('l-user').value.trim();
+  const pass = document.getElementById('l-pass').value.trim();
+  const msg  = document.getElementById('login-msg');
+  if (!user || !pass) { showMsg(msg, 'err', 'Complete los campos'); return; }
   try {
-    const r = await fetch(`${API}/sync/estado`);
-    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const r = await fetch(API + '/config/registrador/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username: user, password: pass})
+    });
     const d = await r.json();
-    const centralIcon = d.centralAccesible ? '🟢 Accesible' : '🔴 No accesible';
-    el.innerHTML = `
-      <b>Sistema central:</b> ${centralIcon}<br>
-      <b>Última descarga:</b> ${d.ultimaDescarga ? new Date(parseInt(d.ultimaDescarga)).toLocaleString() : '—'}<br>
-      <b>Última subida:</b>   ${d.ultimaSubida   ? new Date(parseInt(d.ultimaSubida)).toLocaleString()   : '—'}<br>
-      <b>Votos urna locales:</b> ${d.votosUrnaLocales ?? 0}
-    `;
-  } catch(e) {
-    el.innerHTML = `<span style="color:#e57373;">Error al obtener estado: ${e.message}</span>`;
-  }
+    if (r.ok && (d.exito || d.nombre)) { entrarDashboard('registrador', d.nombre || user); return; }
+  } catch(e) {}
+  try {
+    const r = await fetch(API + '/consultas/jurado/login', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username: user, password: pass})
+    });
+    const d = await r.json();
+    if (r.ok && (d.exito || d.nombre)) { entrarDashboard('jurado', d.nombre || user); return; }
+    showMsg(msg, 'err', d.mensaje || 'Credenciales incorrectas');
+  } catch(e) { showMsg(msg, 'err', 'Sin conexion con el servidor'); }
 }
 
-async function syncDescargar() {
-  mostrarSyncResult('⏳ Descargando datos electorales...', '#333', '#90caf9');
+function entrarDashboard(role, nombre) {
+  userRole = role; userName = nombre;
+  document.getElementById('login-view').style.display    = 'none';
+  document.getElementById('dashboard-view').style.display = 'block';
+  document.getElementById('header-user').style.display   = 'flex';
+  document.getElementById('status-badge-login').style.display = 'none';
+  document.getElementById('header-nombre').textContent   = nombre + ' (' + role + ')';
+  pingServidor(); cargarCiudadanos(); syncEstado(); cargarCentros();
+}
+
+function logout() {
+  userRole = null; userName = ''; ciudadanosCache = [];
+  document.getElementById('dashboard-view').style.display = 'none';
+  document.getElementById('login-view').style.display     = 'flex';
+  document.getElementById('header-user').style.display    = 'none';
+  document.getElementById('status-badge-login').style.display = '';
+  document.getElementById('l-user').value = ''; document.getElementById('l-pass').value = '';
+  showTab('ciudadanos');
+}
+
+function showTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    const oc = b.getAttribute('onclick') || '';
+    if (oc.indexOf("'" + name + "'") >= 0) b.classList.add('active');
+  });
+  if (name === 'centro') cargarCentros();
+}
+
+async function cargarCentros() {
+  const grid = document.getElementById('centros-grid');
+  const banner = document.getElementById('centro-banner');
   try {
-    const r = await fetch(`${API}/sync/descargar`, { method: 'POST' });
-    const d = await r.json();
-    if (d.exitoso) {
-      mostrarSyncResult(`✅ ${d.mensaje} (${d.registrosProcesados} registros)`, '#1b5e20', '#a5d6a7');
+    const r = await fetch(API + '/config/centros');
+    const centros = await r.json();
+    const propio = centros.find(function(c) { return c.estado === 'PROPIO'; });
+    if (propio) {
+      document.getElementById('centro-nombre-actual').textContent = propio.nombre;
+      document.getElementById('centro-dir-actual').textContent = propio.direccion;
+      banner.style.display = 'block';
     } else {
-      mostrarSyncResult(`❌ ${d.mensaje}`, '#b71c1c', '#ef9a9a');
+      banner.style.display = 'none';
     }
+    if (!centros.length) { grid.innerHTML = '<p style="color:#aaa;">No hay centros de votacion disponibles. Sincronice primero los datos electorales.</p>'; return; }
+    grid.innerHTML = centros.map(function(c) {
+      var cls = c.estado.toLowerCase();
+      var chip = { DISPONIBLE: 'Disponible', PROPIO: 'Asignado a este servidor', OCUPADO: 'Asignado a otro servidor' }[c.estado] || c.estado;
+      var onclick = c.estado !== 'OCUPADO' && c.estado !== 'PROPIO'
+        ? 'onclick="asignarCentro(' + c.idCentroVotacion + ', \'' + c.nombre.replace(/'/g,"&#39;") + '\')"'
+        : '';
+      return '<div class="centro-card ' + cls + '" ' + onclick + '>' +
+        '<span class="mesas-badge">' + c.totalMesas + ' mesa' + (c.totalMesas !== 1 ? 's' : '') + '</span>' +
+        '<h3>' + c.nombre + '</h3>' +
+        '<p>' + (c.direccion || '') + '</p>' +
+        '<span class="estado-chip ' + cls + '">' + chip + '</span>' +
+        '</div>';
+    }).join('');
   } catch(e) {
-    mostrarSyncResult(`❌ Error: ${e.message}`, '#b71c1c', '#ef9a9a');
+    grid.innerHTML = '<p style="color:#c00;">Error al cargar centros: ' + e.message + '</p>';
   }
-  syncEstado();
 }
 
-async function syncSubir() {
-  mostrarSyncResult('⏳ Subiendo votos al sistema central...', '#333', '#90caf9');
+async function asignarCentro(id, nombre) {
+  if (!confirm('Asignar este servidor al centro "' + nombre + '"?')) return;
   try {
-    const r = await fetch(`${API}/sync/subir`, { method: 'POST' });
+    const r = await fetch(API + '/config/centros/' + id + '/asignar', { method: 'POST' });
     const d = await r.json();
-    if (d.exitoso) {
-      mostrarSyncResult(`✅ ${d.mensaje}`, '#1b5e20', '#a5d6a7');
+    if (r.ok && d.idCentroVotacion) {
+      alert('Centro "' + d.nombre + '" asignado correctamente. Las tablets de urna ahora solo veran las mesas de este centro.');
     } else {
-      mostrarSyncResult(`❌ ${d.mensaje}`, '#b71c1c', '#ef9a9a');
+      alert('Error: ' + (d.error || JSON.stringify(d)));
     }
-  } catch(e) {
-    mostrarSyncResult(`❌ Error: ${e.message}`, '#b71c1c', '#ef9a9a');
-  }
-  syncEstado();
+  } catch(e) { alert('Error: ' + e.message); }
+  cargarCentros();
 }
 
-function mostrarSyncResult(texto, bg, color) {
-  const el = document.getElementById('sync-result');
-  el.style.display    = 'block';
-  el.style.background = bg;
-  el.style.color      = color;
-  el.textContent      = texto;
-}
-
-// ─── INIT ────────────────────────────────────────
-async function init() {
+async function liberarCentro() {
+  if (!confirm('Liberar la asignacion de centro? Las tablets mostraran todas las mesas.')) return;
   try {
-    const r = await fetch(`${API}/config/ping`);
+    await fetch(API + '/config/centros/asignacion', { method: 'DELETE' });
+  } catch(e) {}
+  cargarCentros();
+}
+
+async function pingServidor() {
+  try {
+    const r = await fetch(API + '/config/ping');
     if (r.ok) {
-      document.getElementById('status-badge').textContent = 'en línea';
-      document.getElementById('status-badge').style.background = '#28a745';
+      ['status-badge','status-badge-login'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = 'en linea'; el.classList.add('online'); }
+      });
     }
   } catch(e) {}
-  cargarHotspot();
-  syncEstado();
-}
-
-async function cargarHotspot() {
-  try {
-    const r = await fetch(`${API}/config/hotspot`);
-    if (!r.ok) return;
-    const d = await r.json();
-    document.getElementById('ssid').value    = d.ssid    || '';
-    document.getElementById('wifi-pass').value = d.password || '';
-    document.getElementById('canal').value  = d.canal   || 6;
-    document.getElementById('puerto').value = d.puerto  || 8081;
-  } catch(e) {}
-}
-
-// ─── CONFIG ──────────────────────────────────────
-async function guardarConfig() {
-  const body = {
-    ssid:     document.getElementById('ssid').value.trim(),
-    password: document.getElementById('wifi-pass').value.trim(),
-    canal:    parseInt(document.getElementById('canal').value),
-    puerto:   parseInt(document.getElementById('puerto').value)
-  };
-  const msg = document.getElementById('config-msg');
-  try {
-    const r = await fetch(`${API}/config/hotspot`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(body)
-    });
-    if (r.ok) { showMsg(msg, 'ok', '✅ Configuración guardada'); }
-    else       { showMsg(msg, 'err', '❌ Error al guardar'); }
-  } catch(e) { showMsg(msg, 'err', '❌ Sin conexión con el servidor'); }
-}
-
-// ─── DISPOSITIVOS ────────────────────────────────
-function mostrarDispositivos() {
-  document.getElementById('config-section').style.display  = 'none';
-  document.getElementById('devices-section').style.display = 'block';
-  cargarDispositivos();
-}
-
-function verConfig() {
-  document.getElementById('devices-section').style.display = 'none';
-  document.getElementById('config-section').style.display  = 'block';
-}
-
-async function cargarDispositivos() {
-  const wrap = document.getElementById('devices-list');
-  wrap.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px 0">Cargando...</p>';
-  try {
-    const r = await fetch(`${API}/config/dispositivos`);
-    if (!r.ok) throw new Error();
-    const devs = await r.json();
-    if (!devs.length) {
-      wrap.innerHTML = '<p style="color:#aaa;text-align:center;padding:24px 0">No hay dispositivos conectados.</p>';
-      return;
-    }
-    let html = '<table><thead><tr><th>IP</th><th>Última conexión</th><th></th></tr></thead><tbody>';
-    devs.forEach(d => {
-      const ip = d.ip;
-      const hora = d.ultimaVez ? new Date(parseInt(d.ultimaVez)).toLocaleTimeString() : '—';
-      html += `<tr><td>${ip}</td><td>${hora}</td><td><button onclick="desconectarDispositivo('${encodeURIComponent(ip)}')" style="padding:2px 10px;font-size:.78rem;background:#b71c1c;">Desconectar</button></td></tr>`;
-    });
-    html += '</tbody></table>';
-    wrap.innerHTML = html;
-  } catch(e) {
-    wrap.innerHTML = '<p style="color:#c00;text-align:center;padding:24px 0">No se pudo obtener la lista de dispositivos.</p>';
-  }
-}
-
-async function desconectarDispositivo(ipEncoded) {
-  await fetch(`${API}/config/dispositivos/${ipEncoded}`, { method: 'DELETE' });
-  cargarDispositivos();
-}
-
-async function desconectarTodos() {
-  await fetch(`${API}/config/dispositivos`, { method: 'DELETE' });
-  cargarDispositivos();
-}
-
-function refrescarDispositivos() { cargarDispositivos(); }
-
-// ─── CONSULTAS DEL JURADO ────────────────────────
-async function loginJurado() {
-  const cedula = document.getElementById('j-cedula').value.trim();
-  const pass   = document.getElementById('j-pass').value.trim();
-  const msg    = document.getElementById('login-msg');
-  if (!cedula || !pass) { showMsg(msg, 'err', 'Complete los campos'); return; }
-  try {
-    const r = await fetch(`${API}/consultas/jurado/login`, {
-      method: 'POST',
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username: cedula, password: pass})
-    });
-    const d = await r.json();
-    if (r.ok && d.exito) {
-      document.getElementById('consultas-login-wrap').style.display = 'none';
-      document.getElementById('consultas-wrap').style.display       = 'block';
-      document.getElementById('jurado-nombre').textContent          = '👤 ' + d.nombre;
-      showMsg(msg, 'ok', '');
-      await cargarCiudadanos();
-    } else {
-      showMsg(msg, 'err', d.mensaje || 'Credenciales incorrectas');
-    }
-  } catch(e) { showMsg(msg, 'err', '❌ Sin conexión'); }
 }
 
 async function cargarCiudadanos() {
   try {
-    const r = await fetch(`${API}/consultas/ciudadanos-urna`);
+    const r = await fetch(API + '/consultas/ciudadanos-urna');
     ciudadanosCache = await r.json();
     renderTabla(ciudadanosCache);
   } catch(e) {
-    document.getElementById('ciudadanos-tbody').innerHTML =
-      '<tr><td colspan="5" style="color:#c00;text-align:center">Error al cargar ciudadanos</td></tr>';
+    document.getElementById('ciudadanos-tbody').innerHTML = '<tr><td colspan="5" style="color:#c00;text-align:center">Error al cargar ciudadanos</td></tr>';
   }
 }
 
 function filtrarCiudadanos() {
   const q = document.getElementById('busqueda').value.toLowerCase();
-  const filtrado = ciudadanosCache.filter(c =>
-    c.nombre.toLowerCase().includes(q) || c.cedula.includes(q)
-  );
-  renderTabla(filtrado);
+  renderTabla(ciudadanosCache.filter(function(c) { return c.nombre.toLowerCase().indexOf(q) >= 0 || c.cedula.indexOf(q) >= 0; }));
 }
 
 function renderTabla(lista) {
   const tbody = document.getElementById('ciudadanos-tbody');
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:#aaa;text-align:center">Sin resultados</td></tr>';
-    return;
+  if (!lista.length) { tbody.innerHTML = '<tr><td colspan="5" style="color:#aaa;text-align:center;padding:24px 0">Sin resultados</td></tr>'; return; }
+  tbody.innerHTML = lista.map(function(c) {
+    return '<tr><td>' + c.nombre + '</td><td>' + c.cedula + '</td><td>' + (c.tipoDocumento || 'CC') + '</td><td>' + (c.direccion || '-') + '</td><td><span class="chip ' + (c.habilitadoDomicilio ? 'off' : 'on') + '">' + (c.habilitadoDomicilio ? 'Domicilio' : 'Urna') + '</span></td></tr>';
+  }).join('');
+}
+
+async function syncEstado() {
+  const el = document.getElementById('sync-estado');
+  try {
+    const r = await fetch(API + '/sync/estado');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const d = await r.json();
+    let html = '<b style="color:#90caf9">Sistema central:</b> <span style="color:#fff">' + (d.centralAccesible ? 'Accesible' : 'No accesible') + '</span><br>' +
+      '<b style="color:#90caf9">Ultima descarga:</b> <span style="color:#fff">' + (d.ultimaDescarga ? new Date(parseInt(d.ultimaDescarga)).toLocaleString() : '-') + '</span><br>' +
+      '<b style="color:#90caf9">Ultima subida:</b> <span style="color:#fff">' + (d.ultimaSubida ? new Date(parseInt(d.ultimaSubida)).toLocaleString() : '-') + '</span><br>' +
+      '<b style="color:#90caf9">Votos urna locales:</b> <span style="color:#fff">' + (d.votosUrnaLocales || 0) + '</span>';
+    if (d.votosPorMesa && d.votosPorMesa.length > 0) {
+      html += '<br><br><b style="color:#90caf9">Votos por mesa:</b>';
+      d.votosPorMesa.forEach(function(m) {
+        const desc = m.numero ? ('Mesa ' + m.numero + ' · ' + (m.tipo || '') + (m.centro ? ' · ' + m.centro : '')) : ('Mesa ID ' + m.idMesa);
+        html += '<br>&nbsp;&nbsp;<span style="color:#a5d6a7">&#9679;</span> <span style="color:#fff">' + desc + ':</span> <span style="color:#ffcc80">' + m.votos + ' voto(s)</span>';
+      });
+    }
+    el.innerHTML = html;
+  } catch(e) { el.innerHTML = '<span style="color:#e57373;">Error al obtener estado: ' + e.message + '</span>'; }
+}
+
+function mostrarAdvertenciaConflictos(count, tipo) {
+  return new Promise(function(resolve) {
+    var msg = 'Se detectaron ' + count + ' voto(s) duplicado(s). El sistema llevara a cabo el control de seguridad de duplicados automaticamente.';
+    document.getElementById('conflictos-msg').textContent = msg;
+    var secs = 6;
+    document.getElementById('conflictos-countdown').textContent = secs;
+    document.getElementById('conflictos-overlay').style.display = 'flex';
+    var t = setInterval(function() {
+      secs--;
+      document.getElementById('conflictos-countdown').textContent = secs;
+      if (secs <= 0) {
+        clearInterval(t);
+        document.getElementById('conflictos-overlay').style.display = 'none';
+        resolve();
+      }
+    }, 1000);
+  });
+}
+
+async function syncDescargar() {
+  try {
+    var cr = await fetch(API + '/sync/conflictos');
+    var cd = await cr.json();
+    if (cd.conflictos > 0) await mostrarAdvertenciaConflictos(cd.conflictos, 'descargar');
+  } catch(e) {}
+  mostrarSyncResult('Descargando datos electorales...', '#333', '#90caf9');
+  try {
+    const r = await fetch(API + '/sync/descargar', { method: 'POST' });
+    const d = await r.json();
+    mostrarSyncResult(d.exitoso ? d.mensaje + ' (' + d.registrosProcesados + ' registros)' : d.mensaje,
+      d.exitoso ? '#1b5e20' : '#b71c1c', d.exitoso ? '#a5d6a7' : '#ef9a9a');
+  } catch(e) { mostrarSyncResult('Sin conexion con el servidor local. Verifique que el servidor este activo.', '#7b341e', '#fed7aa'); }
+  syncEstado();
+}
+
+async function syncSubir() {
+  try {
+    var cr = await fetch(API + '/sync/conflictos');
+    var cd = await cr.json();
+    if (cd.conflictos > 0) await mostrarAdvertenciaConflictos(cd.conflictos, 'subir');
+  } catch(e) {}
+  mostrarSyncResult('Subiendo votos al sistema central...', '#333', '#90caf9');
+  try {
+    const r = await fetch(API + '/sync/subir', { method: 'POST' });
+    const d = await r.json();
+    mostrarSyncResult(d.exitoso ? d.mensaje : d.mensaje, d.exitoso ? '#1b5e20' : '#b71c1c', d.exitoso ? '#a5d6a7' : '#ef9a9a');
+  } catch(e) { mostrarSyncResult('Sin conexion con el servidor local. Verifique que el servidor este activo.', '#7b341e', '#fed7aa'); }
+  syncEstado();
+}
+
+function mostrarSyncResult(texto, bg, color) {
+  const el = document.getElementById('sync-result');
+  var icono = '';
+  var t = texto.toLowerCase();
+  if (t.includes('sin conexion') || t.includes('sin conexión') || t.includes('tunel') || t.includes('túnel') || t.includes('ssh') || t.includes('red')) {
+    icono = '🔌 '; bg = bg || '#7b341e'; color = color || '#fed7aa';
+  } else if (t.includes('autenticacion') || t.includes('autenticación') || t.includes('credencial') || t.includes('unauthorized')) {
+    icono = '🔑 ';
+  } else if (t.includes('configurado') || t.includes('variable') || t.includes('url no configurad')) {
+    icono = '⚙️ ';
+  } else if (t.includes('completada') || t.includes('exitosa') || t.includes(' ok ')) {
+    icono = '✅ ';
+  } else if (bg && bg.includes('b71c1c')) {
+    icono = '❌ ';
   }
-  tbody.innerHTML = lista.map(c => `
-    <tr>
-      <td>${c.nombre}</td>
-      <td>${c.cedula}</td>
-      <td>${c.tipoDocumento || 'CC'}</td>
-      <td>${c.direccion || '—'}</td>
-      <td><span class="chip ${c.habilitadoDomicilio ? 'off' : 'on'}">${c.habilitadoDomicilio ? 'Domicilio' : 'Urna'}</span></td>
-    </tr>`).join('');
+  el.style.display = 'block'; el.style.background = bg; el.style.color = color;
+  el.textContent = icono + texto;
 }
 
-function cerrarConsultas() {
-  document.getElementById('consultas-wrap').style.display       = 'none';
-  document.getElementById('consultas-login-wrap').style.display = 'block';
-  document.getElementById('j-cedula').value = '';
-  document.getElementById('j-pass').value   = '';
-  ciudadanosCache = [];
-}
-
-// ─── HELPERS ─────────────────────────────────────
 function showMsg(el, type, text) {
-  el.className  = `msg ${type}`;
-  el.textContent = text;
-  el.style.display = text ? 'block' : 'none';
-  if (text) setTimeout(() => { el.style.display = 'none'; }, 4000);
+  el.className = 'msg ' + type; el.textContent = text; el.style.display = text ? 'block' : 'none';
+  if (text) setTimeout(function() { el.style.display = 'none'; }, 4000);
 }
 
-init();
+(function init() {
+  fetch(API + '/config/ping').then(function(r) {
+    if (r.ok) {
+      ['status-badge','status-badge-login'].forEach(function(id) {
+        const el = document.getElementById(id);
+        if (el) { el.textContent = 'en linea'; el.classList.add('online'); }
+      });
+    }
+  }).catch(function() {});
+  document.addEventListener('DOMContentLoaded', function() {
+    ['l-user','l-pass'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('keydown', function(e) { if (e.key === 'Enter') loginUnificado(); });
+    });
+  });
+})();
 </script>
 </body>
 </html>

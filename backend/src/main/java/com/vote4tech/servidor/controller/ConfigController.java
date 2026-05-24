@@ -1,5 +1,6 @@
 package com.vote4tech.servidor.controller;
 
+import com.vote4tech.servidor.dto.CentroVotacionDto;
 import com.vote4tech.servidor.dto.HotspotConfigDto;
 import com.vote4tech.servidor.dto.LoginRequestDto;
 import com.vote4tech.servidor.dto.LoginResponseDto;
@@ -7,8 +8,9 @@ import com.vote4tech.servidor.dto.ServerInfoDto;
 import com.vote4tech.servidor.entity.HotspotConfig;
 import com.vote4tech.servidor.entity.RegistradorLocal;
 import com.vote4tech.servidor.repository.HotspotConfigRepository;
+import com.vote4tech.servidor.repository.MesaRepository;
 import com.vote4tech.servidor.repository.RegistradorLocalRepository;
-import com.vote4tech.servidor.service.DispositivoTracker;
+import com.vote4tech.servidor.service.CentroVotacionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -21,10 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/**
- * Las apps Android consultan este endpoint al conectarse a la LAN
- * para verificar que el servidor está activo y obtener su versión.
- */
 @RestController
 @RequestMapping("/config")
 @RequiredArgsConstructor
@@ -33,8 +31,8 @@ public class ConfigController {
 
     private final RegistradorLocalRepository registradorRepo;
     private final HotspotConfigRepository hotspotRepo;
-    private final com.vote4tech.servidor.repository.MesaRepository mesaRepo;
-    private final DispositivoTracker dispositivoTracker;
+    private final MesaRepository mesaRepo;
+    private final CentroVotacionService centroService;
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     @GetMapping("/ping")
@@ -48,7 +46,7 @@ public class ConfigController {
     }
 
     @PostMapping("/registrador/login")
-    @Operation(summary = "Autenticar registrador electoral (para acceder a configuración desde urna)")
+    @Operation(summary = "Autenticar registrador electoral")
     public ResponseEntity<LoginResponseDto> loginRegistrador(@RequestBody LoginRequestDto request) {
         Optional<RegistradorLocal> reg = registradorRepo.findByUsernameAndActivoTrue(request.getUsername());
         if (reg.isEmpty() || !passwordEncoder.matches(request.getPassword(), reg.get().getPassword())) {
@@ -90,39 +88,56 @@ public class ConfigController {
     }
 
     @GetMapping("/mesas")
-    @Operation(summary = "Listar mesas de votación disponibles en este servidor")
+    @Operation(summary = "Listar mesas de votación del centro asignado a este servidor")
     public ResponseEntity<List<Map<String, Object>>> getMesas() {
+        Long centroAsignado = centroService.getCentroAsignadoId();
         List<Map<String, Object>> result = mesaRepo.findAll().stream()
                 .filter(m -> Boolean.TRUE.equals(m.getActivo()))
+                .filter(m -> centroAsignado == null || (m.getCentroVotacion() != null
+                        && m.getCentroVotacion().getIdCentroVotacion().equals(centroAsignado)))
                 .map(m -> {
                     Map<String, Object> map = new HashMap<>();
                     map.put("idMesa", m.getIdMesa());
                     map.put("numero", m.getNumero());
                     map.put("tipo", m.getTipo().name());
                     map.put("centro", m.getCentroVotacion() != null ? m.getCentroVotacion().getNombre() : "");
+                    map.put("idCentro", m.getCentroVotacion() != null ? m.getCentroVotacion().getIdCentroVotacion() : null);
                     return map;
                 })
                 .toList();
         return ResponseEntity.ok(result);
     }
 
-    @GetMapping("/dispositivos")
-    @Operation(summary = "Listar dispositivos que han hecho peticiones al servidor en los ultimos 30 minutos")
-    public ResponseEntity<List<Map<String, String>>> getDispositivos() {
-        return ResponseEntity.ok(dispositivoTracker.getActivos(30));
+    // ── Centro de Votación ────────────────────────────────────────────────────
+
+    @GetMapping("/centros")
+    @Operation(summary = "Listar centros de votación con su disponibilidad")
+    public ResponseEntity<List<CentroVotacionDto>> getCentros() {
+        return ResponseEntity.ok(centroService.findAll());
     }
 
-    @DeleteMapping("/dispositivos/{ip}")
-    @Operation(summary = "Desconectar un dispositivo por IP")
-    public ResponseEntity<Void> desconectarDispositivo(@PathVariable String ip) {
-        dispositivoTracker.remover(java.net.URLDecoder.decode(ip, java.nio.charset.StandardCharsets.UTF_8));
+    @PostMapping("/centros/{id}/asignar")
+    @Operation(summary = "Asignar este servidor a un centro de votación")
+    public ResponseEntity<?> asignarCentro(@PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(centroService.asignar(id));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/centros/asignacion")
+    @Operation(summary = "Liberar la asignación de centro de este servidor")
+    public ResponseEntity<Void> liberarCentro() {
+        centroService.liberar();
         return ResponseEntity.noContent().build();
     }
 
-    @DeleteMapping("/dispositivos")
-    @Operation(summary = "Desconectar todos los dispositivos")
-    public ResponseEntity<Void> desconectarTodos() {
-        dispositivoTracker.removerTodos();
-        return ResponseEntity.noContent().build();
+    @GetMapping("/centro-actual")
+    @Operation(summary = "Obtener el centro de votación asignado a este servidor")
+    public ResponseEntity<?> getCentroActual() {
+        return centroService.getCentroActual()
+                .<ResponseEntity<?>>map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.ok(Map.of("mensaje", "Sin centro asignado")));
     }
 }

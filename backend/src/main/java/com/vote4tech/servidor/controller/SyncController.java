@@ -6,6 +6,8 @@ import com.vote4tech.servidor.service.SyncService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
+
 /**
  * Endpoints REST para el módulo de sincronización.
  *
@@ -45,6 +47,16 @@ public class SyncController {
         return result.isExitoso()
                 ? ResponseEntity.ok(result)
                 : ResponseEntity.status(503).body(result);
+    }
+
+    /**
+     * Devuelve cuántos votos locales ya existen en el CouchDB central (por UUID).
+     * El frontend lo consulta antes de descargar o subir para mostrar la advertencia.
+     */
+    @GetMapping("/conflictos")
+    public ResponseEntity<Map<String, Object>> conflictos() {
+        int count = syncService.contarConflictos();
+        return ResponseEntity.ok(Map.of("conflictos", count));
     }
 
     /**

@@ -16,4 +16,7 @@ public class CentroVotacion {
 
     @Column(name = "direccion", nullable = false, length = 256)
     private String direccion;
+
+    @Column(name = "servidor_id", length = 36)
+    private String servidorId;
 }
