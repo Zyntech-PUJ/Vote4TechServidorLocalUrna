@@ -23,4 +23,7 @@ public class YaVoto {
 
     @Column(name = "timestamp", nullable = false)
     private LocalDateTime timestamp;
+
+    @Column(name = "voto_id", length = 64)
+    private String votoId;
 }

@@ -7,4 +7,5 @@ import java.util.Optional;
 public interface YaVotoRepository extends JpaRepository<YaVoto, Long> {
     boolean existsByCedulaAndIdEleccion(String cedula, Long idEleccion);
     Optional<YaVoto> findByCedulaAndIdEleccion(String cedula, Long idEleccion);
+    Optional<YaVoto> findByVotoId(String votoId);
 }

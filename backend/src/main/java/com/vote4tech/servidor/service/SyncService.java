@@ -7,6 +7,7 @@ import com.vote4tech.servidor.dto.sync.RegistradorSyncDto;
 import com.vote4tech.servidor.dto.sync.SyncEstadoDto;
 import com.vote4tech.servidor.dto.sync.SyncResultDto;
 import com.vote4tech.servidor.entity.RegistradorLocal;
+import com.vote4tech.servidor.entity.YaVoto;
 import com.vote4tech.servidor.repository.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,7 @@ public class SyncService {
 
     private final MesaRepository mesaRepo;
     private final RegistradorLocalRepository registradorRepo;
+    private final YaVotoRepository yaVotoRepo;
     private final JdbcTemplate jdbcTemplate;
     private final com.vote4tech.servidor.repository.ServidorConfigRepository servidorConfigRepo;
     private final ObjectMapper objectMapper;
@@ -76,10 +78,12 @@ public class SyncService {
 
     public SyncService(MesaRepository mesaRepo,
                        RegistradorLocalRepository registradorRepo,
+                       YaVotoRepository yaVotoRepo,
                        JdbcTemplate jdbcTemplate,
                        com.vote4tech.servidor.repository.ServidorConfigRepository servidorConfigRepo) {
         this.mesaRepo          = mesaRepo;
         this.registradorRepo   = registradorRepo;
+        this.yaVotoRepo        = yaVotoRepo;
         this.jdbcTemplate      = jdbcTemplate;
         this.servidorConfigRepo = servidorConfigRepo;
         this.objectMapper      = new ObjectMapper().findAndRegisterModules();
@@ -445,8 +449,7 @@ public class SyncService {
 
     /**
      * Lee todos los docs de votos_urna local y los sube directamente al CouchDB central
-     * usando _bulk_docs. Spring Boot hace las llamadas HTTP (no el contenedor CouchDB),
-     * lo que evita problemas de red del contenedor hacia el túnel del host.
+     * usando _bulk_docs. Omite los votos cuyo ciudadano ya votó en el central (ya_voto).
      *
      * @return número de votos que quedaron en central (nuevos + ya existían)
      * @throws Exception si hay error de red/IO (para que subir() lo clasifique)
@@ -523,9 +526,11 @@ public class SyncService {
                 .retrieve()
                 .body(String.class);
 
-        // 5. Analizar resultado
+        // 5. Analizar resultado y registrar ya_voto central para votos nuevos
         JsonNode results = objectMapper.readTree(bulkResponse);
         int nuevos = 0, yaExistian = 0, errores = 0;
+        RestClient centralClientYaVoto = (centralBackUrl != null && !centralBackUrl.isBlank())
+                ? RestClient.builder().baseUrl(centralBackUrl).build() : null;
         if (results.isArray()) {
             for (JsonNode item : results) {
                 if (item.has("error")) {
@@ -540,6 +545,21 @@ public class SyncService {
                     }
                 } else {
                     nuevos++;
+                    // Registrar en ya_voto central para prevenir duplicados futuros
+                    if (centralClientYaVoto != null && item.has("id")) {
+                        String votoId = item.get("id").asText();
+                        yaVotoRepo.findByVotoId(votoId).ifPresent(yv -> {
+                            try {
+                                centralClientYaVoto.post()
+                                        .uri("/voto/registrar-ya-voto")
+                                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                                        .body("{\"cedula\":\"" + yv.getCedula() + "\",\"idEleccion\":" + yv.getIdEleccion() + "}")
+                                        .retrieve().toBodilessEntity();
+                            } catch (Exception ex) {
+                                log.warn("No se pudo registrar ya_voto central para {}: {}", yv.getCedula(), ex.getMessage());
+                            }
+                        });
+                    }
                 }
             }
         }
@@ -597,7 +617,6 @@ public class SyncService {
             if (rows == null || !rows.isArray()) return 0;
 
             int deleted = 0;
-            Set<Long> electionsAffected = new HashSet<>();
             Set<String> idsEliminados = new HashSet<>();
             for (JsonNode row : rows) {
                 JsonNode doc = row.get("doc");
@@ -611,19 +630,11 @@ public class SyncService {
                             .retrieve().toBodilessEntity();
                     deleted++;
                     idsEliminados.add(id);
-                    if (doc.has("idEleccion") && !doc.get("idEleccion").isNull())
-                        electionsAffected.add(doc.get("idEleccion").asLong());
                 } catch (Exception ex) {
                     log.warn("No se pudo eliminar doc local {}: {}", id, ex.getMessage());
                 }
             }
             if (deleted > 0) log.info("Docs CouchDB locales eliminados por duplicidad con central: {}", deleted);
-
-            // Para cada elección afectada, eliminar ya_voto local (la global tiene prioridad)
-            for (Long idEleccion : electionsAffected) {
-                int yv = jdbcTemplate.update("DELETE FROM ya_voto WHERE id_eleccion = ?", idEleccion);
-                if (yv > 0) log.info("ya_voto local eliminado para elección {} ({} registros) — la BD global tiene prioridad.", idEleccion, yv);
-            }
 
             // Descargar del central las versiones definitivas de los docs que se eliminaron localmente
             if (!idsEliminados.isEmpty()) {

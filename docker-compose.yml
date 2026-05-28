@@ -81,8 +81,8 @@ services:
       COUCHDB_DB_URNA: votos_urna
       SERVER_ADDRESS: 0.0.0.0
       PORT: 8080
-      CENTRAL_BACK_URL: https://genome-sale-tomatoes-inserted.trycloudflare.com
-      CENTRAL_COUCHDB_URL: https://charm-maternity-poems-subjects.trycloudflare.com
+      CENTRAL_BACK_URL: https://east-animals-blowing-best.trycloudflare.com
+      CENTRAL_COUCHDB_URL: https://most-plane-weekly-secondary.trycloudflare.com
     depends_on:
       postgres:
         condition: service_healthy
